@@ -1,0 +1,9 @@
+{"index_created": "2026-01-15 10:00:00+00:00", "index_created_unix_timestamp": 1768471200,
+ "reporting_orgs": [
+  {"short_name": "donor", "organisation_identifier": "GB-GOV-1", "iati_identifier": "GB-GOV-1", "human_readable_name": "Donor Ministry", "organisation_type": "10", "hq_country": "GB", "reporting_source_type": "primary_source"},
+  {"short_name": "ngo", "organisation_identifier": "GB-CHC-111", "iati_identifier": "GB-CHC-111", "human_readable_name": "Intermediary NGO", "organisation_type": "21", "hq_country": "GB", "reporting_source_type": "primary_source"},
+  {"short_name": "aggregator", "organisation_identifier": "XI-IATI-AGG", "iati_identifier": "XI-IATI-AGG", "human_readable_name": "Aggregator", "organisation_type": "90", "hq_country": "", "reporting_source_type": "secondary_source"},
+  {"short_name": "galv", "organisation_identifier": "GB-COH-222", "iati_identifier": "GB-COH-222", "human_readable_name": "Livestock Alliance", "organisation_type": "21", "hq_country": "GB", "reporting_source_type": "primary_source"},
+  {"short_name": "local", "organisation_identifier": "UG-NGB-333", "iati_identifier": "UG-NGB-333", "human_readable_name": "Local Partner", "organisation_type": "22", "hq_country": "UG", "reporting_source_type": "primary_source"},
+  {"short_name": "broken", "organisation_identifier": "GB-CHC-555", "iati_identifier": "GB-CHC-555", "human_readable_name": "Broken File Org", "organisation_type": "21", "hq_country": "GB", "reporting_source_type": "primary_source"}
+ ]}

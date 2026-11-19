@@ -1,0 +1,1962 @@
+---
+title: "IATI as network data: results"
+subtitle: "Traceability of funding in IATI data, from the IATI Bulk Data Service copy of 30 October 2026"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+    fig-width: 8
+    fig-height: 4.5
+execute:
+  echo: false
+  warning: false
+  message: false
+params:
+  out_dir: "../outputs/bulk_2026-10-30"
+---
+
+```{r setup}
+# Reads only pipeline outputs. figures.R runs the setup chunks of full_run.qmd (data
+# readers, indicators, colors, map base) and adds the shared figure helpers.
+# The working paper figures are drawn by the same code as in the working paper; here
+# they are shown on the page with their captions instead of being saved for Word.
+out <- params$out_dir
+# The OECD DAC list of ODA recipients is not distributed with this repository
+stopifnot("Download the OECD DAC List of ODA Recipients first: see report/reference/README.md" =
+  file.exists("reference/dac_oda_recipients_2025.csv"))
+source("figures.R")
+fig_dir <- "results_figs"
+dir.create(fig_dir, showWarnings = FALSE)
+.figs <- list()
+save_fig <- function(p, name, caption, width = 6.5, height = 4, note = NULL) {
+  stopifnot(str_detect(name, "^fig"), nzchar(caption))
+  .figs[[name]] <<- list(p = p & no_title, caption = caption, width = width, height = height)
+  invisible(p)
+}
+wp_num <- function(key, value, ...) invisible(value) # numbers for the paper's text: not needed here
+write_captions <- function() invisible(NULL)
+write_wp_numbers <- function() invisible(NULL)
+
+# Figure and table numbers follow the working paper (version 3). The captions were
+# written with the earlier numbers, so every "Figure n" / "Table n" is renumbered.
+wp_num_fig <- c(fig_new_case_pair = "2", fig_new_org_level_summary = "4", fig_new_multipliers = "5",
+  fig04_activity_link_network = "6", fig05_link_quality_by_type = "7", fig_new_ind3_by_publisher = "8",
+  fig_new_ind4_2025 = "9", fig06_chain_depth = "10", fig07_longest_path = "11", fig_new_example_chain_1 = "12",
+  fig08_chain_ends = "13", fig_new_example_chain_2 = "14", fig09_country_maps = "15", fig10_flow_routes = "16",
+  fig11_flow_small_maps = "17", fig12_flow_sankey = "18", fig_new_location_precision = "19",
+  fig13_chain_ethiopia = "20", fig14_chain_nepal = "21", fig_new_counter_example_chain = "22",
+  fig_new_chain_map_1 = "23", fig_new_chain_map_2 = "24", fig_new_chain_map_4 = "25", fig_new_chain_map_5 = "26",
+  fig15_local_share = "27", fig_new_local_by_steps = "28", fig_new_example_chain_3 = "A.1", fig_new_example_chain_5 = "A.2",
+  fig04b_activity_link_network_by_year = "6b", fig05b_link_quality_by_type_by_year = "7b",
+  fig06b_chain_depth_by_year = "10b", fig08b_chain_ends_by_year = "13b", fig09b_country_maps_2025 = "15b",
+  fig11b_flows_by_year = "17b", fig15b_local_share_2025 = "27b")
+wp_num_tab <- c(`1` = "1", `2` = "2", `3` = "3", `4` = "4", `5` = "5", `6` = "7", `7` = "8", `8` = "9",
+  `9` = "11", `10` = "12", `11` = "13", `12` = "14", `13` = "15", `14` = "16")
+.old_fig <- local({ n <- names(wp_num_fig)[str_detect(names(wp_num_fig), "^fig\\d")]
+  setNames(wp_num_fig[n], str_remove(str_match(n, "^fig(\\d+b?)_")[, 2], "^0")) })
+renumber <- function(x) str_replace_all(x, "\\b(Figures?|Tables?) (\\d+[a-z]?)((?:,? (?:and|or|to) \\d+[a-z]?)*)", function(m) {
+  kind <- str_match(m, "^(Figures?|Tables?)")[, 2]
+  map <- if (str_starts(kind, "Fig")) .old_fig else wp_num_tab
+  str_replace_all(m, "\\d+[a-z]?", function(n) coalesce(unname(map[n]), n))
+})
+# American spelling in captions; file names such as organisations.parquet are kept
+us_spell <- function(x) x |>
+  str_replace_all("(?<![\\w/])([Oo])rganis(ation|ations|ed|e|ing)\\b(?!\\.[a-z])", "\\1rganiz\\2") |>
+  str_replace_all("\\b([Ll])icence", "\\1icense") |>
+  str_replace_all("\\b([Cc])olour", "\\1olor") |>
+  str_replace_all("\\b([Gg])rey\\b", "\\1ray") |>
+  str_replace_all("\\b([Nn])ormalis", "\\1normaliz") |>
+  str_replace_all("\\bprogramme", "program") |>
+  str_replace_all("\\b([Ll])abelled", "\\1abeled") |>
+  str_replace_all("\\brecognised", "recognized")
+show_fig <- function(name) {
+  f <- .figs[[name]]
+  stopifnot(!is.null(f))
+  png <- file.path(fig_dir, paste0(name, ".png"))
+  ggsave(png, f$p, width = f$width, height = f$height, dpi = 200, bg = "white")
+  num <- unname(wp_num_fig[name])
+  lab <- if (is.na(num)) "" else paste0("**Figure ", num, ".** ")
+  cat("\n\n![](", png, "){width=", round(100 * min(1, f$width / 6.5)), "%}\n\n", lab, us_spell(renumber(f$caption)), "\n\n", sep = "")
+}
+show_figs <- function(pattern) for (n in str_subset(names(.figs), pattern)) show_fig(n)
+# The two check scripts also write notes for the paper into docs/; not from this page
+writeLines <- function(text, con = stdout(), ...) {
+  if (is.character(con) && str_detect(con, "^\\.\\./docs/")) return(invisible(NULL))
+  base::writeLines(text, con, ...)
+}
+```
+
+```{r wp-fig04, include = FALSE}
+invisible(run_chunk("orgnet-build")) # og: largest connected group; edge attribute evidence
+on_names <- rd_pq("org_nodes.parquet", col_select = c(org_ref, org_name))
+oe_act <- rd_pq("org_edges.parquet") |> filter(has_activity_link) |> select(from_org, to_org, n_activity_links)
+# Activity links per organisation, as funder or receiver (sum over its organisation links)
+act_links <- bind_rows(transmute(oe_act, org_ref = from_org, n = n_activity_links), transmute(oe_act, org_ref = to_org, n = n_activity_links)) |>
+  count(org_ref, wt = n, name = "activity_links")
+V(og)$grp <- pub_group(V(og)$org_type)
+V(og)$partners <- sapply(V(og), \(v) length(unique(neighbors(og, v, mode = "all")))) # distinct organisations linked
+nodes4 <- tibble(org_ref = V(og)$name, grp = V(og)$grp, partners = V(og)$partners) |>
+  left_join(act_links, by = "org_ref") |> left_join(on_names, by = "org_ref")
+# Labels: the ten organisations linked to most other organisations (hubs). The ten with most
+# activity links are a different list; both are recorded below for the text.
+top10 <- nodes4 |> slice_max(partners, n = 10, with_ties = FALSE) |> mutate(rank = row_number())
+top10_act <- nodes4 |> slice_max(activity_links, n = 10, with_ties = FALSE) |> mutate(rank = row_number())
+ev_lab <- c(confirmed = "Confirmed (both sides report)", `one-sided` = "One side reports")
+ev_grey <- c("Confirmed (both sides report)" = "grey15", "One side reports" = "grey72")
+E(og)$ev <- factor(ev_lab[E(og)$evidence], rev(ev_lab))
+set.seed(6)
+lay <- create_layout(og, layout = "fr")
+lay$rank <- top10$rank[match(lay$name, top10$org_ref)]
+lay$lab <- ifelse(is.na(lay$rank), NA, paste0(lay$rank, ". ", wrap_name(nodes4$org_name[match(lay$name, nodes4$org_ref)], 24)))
+size_scale <- scale_size_area(max_size = 7, name = "Organisations linked", breaks = \(l) pretty(c(1, l[2]), 3)[-1])
+net_plot <- function(edge_alpha = 0.55) {
+  ggraph(lay) +
+    # one-sided links first, so confirmed links are drawn on top
+    geom_edge_link(aes(colour = ev, alpha = ev, filter = evidence != "confirmed"), width = 0.25) +
+    geom_edge_link(aes(colour = ev, alpha = ev, filter = evidence == "confirmed"), width = 0.3) +
+    geom_node_point(aes(fill = grp, size = partners), shape = 21, colour = "white", stroke = 0.2) +
+    scale_edge_colour_manual(values = ev_grey, name = "Activity links", guide = guide_legend(override.aes = list(edge_width = 0.9), reverse = TRUE)) +
+    scale_edge_alpha_manual(values = c(0.9, 0.35) |> setNames(rev(ev_lab)), guide = "none") +
+    scale_fill_manual(values = pub_group_col, name = "Publisher type", drop = FALSE,
+                      guide = guide_legend(override.aes = list(size = 3))) +
+    size_scale + guides(size = guide_legend(override.aes = list(fill = "grey60"))) +
+    coord_fixed() + theme_void(base_size = 8) +
+    theme(legend.position = "bottom", legend.box = "vertical", legend.margin = margin(0, 0, 0, 0),
+          legend.spacing.y = unit(1, "mm"))
+}
+p4 <- net_plot() +
+  # the labelled organisations and the 20 largest circles (unlabelled, empty label) push the labels away
+  geom_label_repel(data = as_tibble(lay) |> filter(!is.na(rank) | rank(-partners, ties.method = "first") <= 20) |>
+                     mutate(lab = coalesce(lab, ""), psize = 7 * sqrt(partners / max(lay$partners))), # drawn circle size
+                   aes(x, y, label = lab, point.size = psize), size = 2.3, lineheight = 0.85,
+                   label.size = 0.15, label.padding = unit(0.12, "lines"), fill = alpha("white", 0.85),
+                   min.segment.length = 0, segment.size = 0.25, box.padding = 0.5, point.padding = 0.1, force = 2,
+                   max.overlaps = Inf, seed = 4)
+n_conf4 <- sum(E(og)$evidence == "confirmed")
+# The IATI organisation types drawn grey, with counts, for the caption
+# European Commission services (XI-IATI-EC_ identifiers) typed "Other public sector": named in the caption.
+# Short name: the acronym in brackets in the name, else "DG" plus the identifier suffix for a directorate-general, else the suffix.
+ec <- tibble(org_ref = V(og)$name, type = V(og)$org_type) |> filter(type == "Other public sector", str_detect(org_ref, "^XI-IATI-EC_")) |>
+  left_join(on_names, by = "org_ref") |>
+  mutate(sfx = str_remove(org_ref, "^XI-IATI-EC_"), acr = str_match(org_name, "\\(([A-Z]{2,})\\)\\s*$")[, 2],
+         short = case_when(!is.na(acr) ~ acr, str_detect(org_name, "Directorate-General") ~ paste("DG", sfx), TRUE ~ sfx)) |>
+  arrange(short)
+ec_txt <- if (nrow(ec)) paste0(", including the European Commission services ", paste(head(ec$short, -1), collapse = ", "),
+                               if (nrow(ec) > 1) " and ", tail(ec$short, 1)) else ""
+other_types <- tibble(type = V(og)$org_type, grp = V(og)$grp) |> filter(grp == "Other") |> count(type, sort = TRUE) |>
+  mutate(lab = case_when(type == "Other" ~ paste0("the IATI type Other (", n, ")"),
+                         type == "Other public sector" ~ paste0("other public sector (", n, ec_txt, ")"),
+                         TRUE ~ paste0(str_to_lower(type, locale = "en"), " (", n, ")"))) |>
+  with(paste(lab, collapse = ", "))
+save_fig(p4, "fig04_activity_link_network", width = 6.5, height = 6.8, caption = paste0(
+  "Figure 4. Organisations joined by activity links: the largest connected group. Shows the organisations behind indicator 1 of Table 4 (activities connected to an activity of another organisation; Section 4.2): each line is a link that makes the activities at both ends count as connected. It is the part of the organisation network (Section 3.2) that can be followed activity by activity (the 'linked' level of Table 2). ",
+  "The group holds ", fmt(vcount(og)), " of ", fmt(vcount(og_all)),
+  " organisations and ", fmt(ecount(og)), " organisation links. Each circle is an organisation, coloured by the IATI organisation type of its own published data ",
+  "(grey, other types: ", other_types, "). Circle area: number of organisations linked. Each line is at least one activity link between two organisations; ",
+  "dark lines: at least one of those activity links is reported by both sides (", fmt(n_conf4), " organisation links); light lines: reported by one side only. ",
+  "Numbered labels: the ten organisations linked to most other organisations. Layout: force-directed (Fruchterman-Reingold), so position shows ",
+  "connection, not geography. All years. Unit: organisations; organisation links."),
+  note = paste0("Add a paragraph on the two kinds of 'top ten'. Ranked by organisations linked (the labels): ",
+                paste0(clean_name(top10$org_name), " (", top10$partners, ")", collapse = "; "), ". ",
+                "Ranked by activity links, as funder or receiver: ",
+                paste0(clean_name(top10_act$org_name), " (", fmt(top10_act$activity_links), " activity links, ", top10_act$partners, " organisations)", collapse = "; "), ". ",
+                fmt(sum(top10$org_ref %in% top10_act$org_ref)), " organisations are on both lists. ",
+                "The first list shows hubs that connect many organisations (breadth); the second shows organisations whose funding is split into many linked activities, ",
+                "sometimes with very few partners (depth of linking, e.g. one FCDO activity named as funder by thousands of CAFOD activities). ",
+                "Values in wp_numbers.csv: fig4_top* (organisations linked) and fig4_actlinks_top* (activity links)."))
+```
+
+```{r wp-fig04b, include = FALSE}
+# Years of each organisation link: the transaction years of its activity links (link_transactions.parquet)
+ae_net <- rd_pq("activity_edges.parquet", col_select = c(from_activity, to_activity, from_org, to_org, in_network)) |> filter(in_network)
+lt <- rd_pq("link_transactions.parquet", col_select = c(from_activity, to_activity, transaction_year))
+org_years <- lt |> filter(transaction_year %in% 2023:2025) |> distinct(from_activity, to_activity, transaction_year) |>
+  inner_join(ae_net, by = c("from_activity", "to_activity")) |> distinct(from_org, to_org, year = transaction_year)
+el <- igraph::as_data_frame(og, what = "edges") |> mutate(eid = row_number())
+yr_edges <- el |> inner_join(org_years, by = c(from = "from_org", to = "to_org"), relationship = "many-to-many")
+yr_nodes <- bind_rows(transmute(yr_edges, year, name = from), transmute(yr_edges, year, name = to)) |> distinct(year, name)
+xy <- select(as_tibble(lay), name, x, y, grp, partners, rank)
+seg <- el |> left_join(rename(xy, x = x, y = y) |> select(name, x, y), by = c(from = "name")) |>
+  left_join(select(xy, name, xend = x, yend = y), by = c(to = "name"))
+panel <- function(yr) {
+  e <- semi_join(seg, filter(yr_edges, year == yr), by = "eid") |> mutate(ev = factor(ev_lab[evidence], rev(ev_lab))) |> arrange(ev)
+  n <- xy |> mutate(on = name %in% yr_nodes$name[yr_nodes$year == yr])
+  ggplot() +
+    geom_point(data = filter(n, !on), aes(x, y), colour = "grey88", size = 0.4) +
+    geom_segment(data = e, aes(x, y, xend = xend, yend = yend, colour = ev, alpha = ev), linewidth = 0.25) +
+    geom_point(data = filter(n, on), aes(x, y, fill = grp, size = partners), shape = 21, colour = "white", stroke = 0.15) +
+    geom_text_repel(data = filter(n, on, !is.na(rank)), aes(x, y, label = rank), size = 2, fontface = "bold",
+                    min.segment.length = 0, segment.size = 0.2, box.padding = 0.3, max.overlaps = Inf, seed = 4) +
+    scale_colour_manual(values = ev_grey, name = "Activity links", drop = FALSE) +
+    scale_alpha_manual(values = c(0.9, 0.35) |> setNames(rev(ev_lab)), guide = "none") +
+    scale_fill_manual(values = pub_group_col, name = "Publisher type", drop = FALSE) +
+    scale_size_area(max_size = 4, limits = c(0, max(xy$partners)), guide = "none") +
+    coord_fixed() + labs(subtitle = NULL) +
+    annotate("text", x = min(xy$x), y = max(xy$y), hjust = 0, vjust = 1, size = 3, fontface = "bold", label = yr) +
+    theme_void(base_size = 7.5)
+}
+yr_counts <- yr_edges |> group_by(year) |> summarise(links = n_distinct(eid), confirmed = n_distinct(eid[evidence == "confirmed"])) |>
+  left_join(count(yr_nodes, year, name = "orgs"), by = "year")
+p4b <- (panel(2023) | panel(2024) | panel(2025)) + plot_layout(guides = "collect") &
+  theme(legend.position = "bottom", legend.box = "vertical", legend.spacing.y = unit(0.5, "mm"), legend.margin = margin(0, 0, 0, 0)) &
+  guides(fill = guide_legend(override.aes = list(size = 2.5), nrow = 1), colour = guide_legend(override.aes = list(linewidth = 0.9), reverse = TRUE))
+yr_txt <- paste0(yr_counts$year, ": ", fmt(yr_counts$orgs), " organisations, ", fmt(yr_counts$links), " links", collapse = "; ")
+save_fig(p4b, "fig04b_activity_link_network_by_year", width = 6.5, height = 3.4, caption = paste0(
+  "Figure 4b. Organisations joined by activity links, by year (indicator 1 of Table 4 seen by organisation, as in Figure 4; Sections 3.2 and 4.2): the group of Figure 4, with organisations in the same positions, showing only the organisation links ",
+  "with at least one activity link that has a transaction dated in that year (", yr_txt, "). Light grey points: organisations with no such link that year. ",
+  "Colours, line shades and circle area as in Figure 4; numbers are the ten labelled organisations of Figure 4 (most organisations linked). ",
+  "Whether a link is confirmed refers to all years. Years by transaction date; 2025 may rise as receivers report later. Unit: organisations; organisation links."))
+# numbers
+wp_num("fig4_orgs", vcount(og), "organisations", "all years", "org_edges.parquet (has_activity_link)", "Figure 4: organisations in the largest group joined by activity links")
+wp_num("fig4_orgs_all", vcount(og_all), "organisations", "all years", "org_edges.parquet (has_activity_link)", "Organisations joined by activity links, all groups")
+wp_num("fig4_groups", comp$no, "groups", "all years", "org_edges.parquet (has_activity_link)", "Separate groups of organisations joined by activity links")
+wp_num("fig4_links", ecount(og), "organisation links", "all years", "org_edges.parquet (has_activity_link)", "Figure 4: organisation links in the largest group")
+wp_num("fig4_links_confirmed", n_conf4, "organisation links", "all years", "org_edges.parquet (n_activity_links_confirmed)", "Figure 4: of these, with at least one activity link confirmed by both sides")
+for (i in seq_len(nrow(top10))) {
+  nm <- clean_name(top10$org_name[i])
+  wp_num(paste0("fig4_top", i, "_orgs_linked"), top10$partners[i], "organisations", "all years", "org_edges.parquet (has_activity_link)", paste0("Figure 4 label ", i, " (ranked by organisations linked): organisations linked, ", nm, " (", top10$org_ref[i], ")"))
+  wp_num(paste0("fig4_top", i, "_activity_links"), top10$activity_links[i], "activity links", "all years", "org_edges.parquet (n_activity_links)", paste0("Figure 4 label ", i, ": activity links as funder or receiver, ", nm))
+}
+for (i in seq_len(nrow(top10_act))) {
+  nm <- clean_name(top10_act$org_name[i])
+  wp_num(paste0("fig4_actlinks_top", i, "_activity_links"), top10_act$activity_links[i], "activity links", "all years", "org_edges.parquet (n_activity_links)", paste0("Rank ", i, " by activity links (as funder or receiver): ", nm, " (", top10_act$org_ref[i], ")"))
+  wp_num(paste0("fig4_actlinks_top", i, "_orgs_linked"), top10_act$partners[i], "organisations", "all years", "org_edges.parquet (has_activity_link)", paste0("Rank ", i, " by activity links: organisations linked, ", nm))
+}
+wp_num("fig4_top10_overlap", sum(top10$org_ref %in% top10_act$org_ref), "organisations", "all years", "org_edges.parquet", "Organisations in both top-ten lists (organisations linked; activity links)")
+for (i in seq_len(nrow(yr_counts))) {
+  y <- as.character(yr_counts$year[i])
+  wp_num(paste0("fig4b_orgs_", y), yr_counts$orgs[i], "organisations", y, "org_edges.parquet; activity_edges.parquet; link_transactions.parquet", "Figure 4b: organisations with a link that has a transaction in the year")
+  wp_num(paste0("fig4b_links_", y), yr_counts$links[i], "organisation links", y, "org_edges.parquet; activity_edges.parquet; link_transactions.parquet", "Figure 4b: organisation links with a transaction in the year")
+  wp_num(paste0("fig4b_links_confirmed_", y), yr_counts$confirmed[i], "organisation links", y, "org_edges.parquet; activity_edges.parquet; link_transactions.parquet", "Figure 4b: of these, confirmed (all-years evidence)")
+}
+```
+
+```{r wp-fig-org-level, include = FALSE}
+sc_lev <- c(global = "All years", all_2023 = "2023", all_2024 = "2024", all_2025 = "2025")
+org_lv <- ind |> filter(indicator %in% c("7b", "D2g"), scope %in% names(sc_lev), group != "All publishers") |>
+  select(scope, group, indicator, numerator, denominator, percent, small_base) |>
+  pivot_wider(names_from = indicator, values_from = c(numerator, denominator, percent, small_base))
+# Publisher types with 30 or more publishing organisations across all years; ordered by that number
+keep <- org_lv |> filter(scope == "global", denominator_7b >= 30) |> arrange(desc(denominator_7b))
+org_lv <- org_lv |> filter(group %in% keep$group) |>
+  transmute(scope, period = factor(sc_lev[scope], sc_lev), group = factor(group, rev(keep$group)),
+            pub = denominator_7b, small = small_base_7b,
+            connected = 100 - percent_7b, traced_share = 100 * numerator_D2g / denominator_D2g)
+long <- org_lv |> pivot_longer(c(pub, connected, traced_share), names_to = "measure") |>
+  mutate(measure = factor(measure, c("pub", "connected", "traced_share"),
+                          c("A. Publishing organisations\n(number)", "B. With a connected activity\n(% of publishing organisations)",
+                            "C. Share of all traced\ntransactions (%)")),
+         fillc = if_else(period == "All years", as.character(pub_group(as.character(group))), NA_character_),
+         lab = if_else(period == "All years", if_else(measure == levels(measure)[1], fmt(value), pct_lab(value)), NA_character_)) |>
+  group_by(measure) |> mutate(lab_x = 1.12 * max(value, na.rm = TRUE)) |> ungroup() # labels in a column right of the dots
+yr_shape <- c(`All years` = 21, `2023` = 1, `2024` = 2, `2025` = 0)
+p_org <- ggplot(long, aes(value, group)) +
+  geom_line(aes(group = group), data = filter(long, period != "All years"), colour = "grey80", linewidth = 0.4) +
+  geom_point(aes(shape = period), data = filter(long, period != "All years"), colour = "grey35", size = 1.5, stroke = 0.5) +
+  geom_point(aes(fill = fillc), data = filter(long, period == "All years"), shape = 21, colour = "grey20", size = 2.6, stroke = 0.3) +
+  geom_text(aes(lab_x, label = lab), data = filter(long, period == "All years"), hjust = 0, size = 2.3) +
+  facet_wrap(~measure, scales = "free_x", nrow = 1) +
+  scale_fill_manual(values = pub_group_col, guide = "none") +
+  scale_shape_manual(values = yr_shape[-1], name = "Year (by transaction date)") +
+  scale_x_continuous(expand = expansion(mult = c(0.04, 0.32)), limits = c(0, NA)) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 8) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.y = element_line(colour = "grey93"),
+        strip.text = element_text(face = "bold", hjust = 0, size = 7.5), legend.position = "bottom",
+        panel.spacing.x = unit(4, "mm"))
+small_n <- org_lv |> filter(small, period != "All years") |> mutate(t = paste0(group, " ", period, " (", pub, ")"))
+save_fig(p_org, "fig_new_org_level_summary", width = 6.5, height = 3.6, caption = paste0(
+  "Organisation level by publisher type. This figure reports the organisation-level indicators of Table 4 (Section 2.5) for each publisher type: ",
+  "panel B is indicator 7b (publishing organisations with no connected activity), shown as its complement; panel A is the base of 7b; ",
+  "panel C is D2g, which splits the denominator of indicator D2 (all traced transactions) by publisher type and so shows who holds the traced part of the system that D2 measures as concentrated in ten publishers. Publisher type: IATI organisation type of the reporting organisation; types with 30 or more publishing organisations across all years (",
+  nrow(keep), " types), ordered by that number. Filled circle, and the value printed at the right: all years, coloured by publisher type group as in Figures 4 and 5; ",
+  "open symbols: 2023, 2024 and 2025 (transactions by date). ",
+  "A: publishing organisations, meaning reporting organisations with at least one activity with transactions in the period (unit: organisations; the denominator of indicator 7b). ",
+  "B: of these, the share with at least one activity connected to an activity of another organisation (100% minus indicator 7b; unit: organisations). ",
+  "C: share of all traced transactions in the period that publishers of the type report; traced transactions name a published counterpart activity of another organisation and are not internal ",
+  "(indicator D2g; unit: transactions; the shares of all types, including those not shown, add up to 100%). ",
+  "Fewer than 30 publishing organisations in a year, so the year values in B are based on few organisations: ",
+  paste(small_n$t, collapse = "; "), "."),
+  note = paste0("D2g is new: add a row for it to Table 4 (organisation level, unit transactions, reported in 3.2) and to Annex Table A.7 ",
+                "(numerator: traced transactions reported by publishers of the type; denominator: all traced transactions, as for D2). ",
+                "In Section 3.1, say that 7b and D2g are also reported by publisher type, and in Section 3.2 refer to this figure where 7b and D2 are discussed."))
+for (i in seq_len(nrow(org_lv))) {
+  r <- org_lv[i, ]; sc <- if (r$scope == "global") "all years" else as.character(r$period); g0 <- as.character(r$group)
+  wp_num(paste0("org_pub_", g0, "_", sc), r$pub, "organisations", sc, "indicators.csv (7b denominator)", paste0("Publishing organisations, ", g0))
+  wp_num(paste0("org_connected_", g0, "_", sc), round(r$connected, 1), "%", sc, "indicators.csv (100 minus 7b)", paste0("Publishing organisations with a connected activity, ", g0))
+  wp_num(paste0("org_traced_share_", g0, "_", sc), round(r$traced_share, 1), "%", sc, "indicators.csv (D2g)", paste0("Share of all traced transactions held by ", g0))
+}
+```
+
+```{r wp-fig-multipliers, include = FALSE}
+mult <- rd("multipliers.csv") |> left_join(rd("org_countries.csv") |> select(org_ref, org_country), by = "org_ref")
+# Companion data: every intermediary
+write_csv(mult |> transmute(org_ref, org_name = clean_name(org_name), org_type, country_of_registration = org_country,
+                            paths_through, direct_recipients, downstream_orgs, upstream_orgs),
+          file.path(wp_dir, "multipliers_all.csv"), na = "")
+# The organisations in Table 7 of the working paper (selected in the text; by identifier)
+t7_refs <- c("GB-COH-04105827", "NL-KVK-72849770", "GB-COH-03580586-GEC", "NL-KVK-41009723", "NL-KVK-27108436", "GB-CHC-1065972",
+             "NL-KVK-41158230", "NL-KVK-41152786", "GB-COH-1102208", "NL-KVK-41197577", "GB-CHC-1062638", "NL-KVK-91420784",
+             "GB-CHC-218186", "KE-NCB-OP/218/051/924/84")
+stopifnot("A Table 7 organisation is no longer an intermediary" = all(t7_refs %in% mult$org_ref))
+m7 <- mult |> filter(org_ref %in% t7_refs) |> arrange(desc(paths_through), desc(downstream_orgs)) |>
+  mutate(grp = pub_group(org_type),
+         lab = paste0(wrap_name(org_name, 30), "\n", org_type, ", ", coalesce(org_country, "country unknown"), " · ", fmt(paths_through), " paths"),
+         y = factor(org_ref, rev(org_ref)))
+# Square-root scale drawn directly: bar length sqrt(n); ticks labelled with n
+brk <- c(1, 5, 10, 20, 50, 100, 200)
+# Each side has its own range; panel widths are proportional to the ranges, so one unit has the same length on both sides
+xmax_up <- sqrt(max(m7$upstream_orgs)) * 1.45
+xmax_dn <- sqrt(max(m7$downstream_orgs)) * 1.38
+bar_theme <- theme_minimal(base_size = 8) + theme(panel.grid.major.y = element_blank(), panel.grid.minor = element_blank(),
+                                                 axis.text.y = element_blank(), legend.position = "none", plot.margin = margin(2, 2, 2, 2))
+p_up <- ggplot(m7, aes(-sqrt(upstream_orgs), y, fill = grp)) + geom_col(width = 0.6) +
+  geom_text(aes(label = upstream_orgs), hjust = 1.3, size = 2.3) +
+  scale_x_continuous(breaks = -sqrt(brk[brk <= max(m7$upstream_orgs)]), labels = brk[brk <= max(m7$upstream_orgs)], limits = c(-xmax_up, 0), expand = c(0, 0)) +
+  scale_fill_manual(values = pub_group_col, guide = "none") +
+  labs(x = "Upstream\norganisations", y = NULL) + bar_theme
+p_mid <- ggplot(m7, aes(0, y)) + geom_text(aes(label = lab), size = 2.25, lineheight = 0.9) +
+  scale_x_continuous(limits = c(-1, 1)) + theme_void() + theme(plot.margin = margin(2, 0, 2, 0))
+p_dn <- ggplot(m7, aes(y = y, fill = grp)) +
+  geom_col(aes(sqrt(downstream_orgs)), width = 0.6, alpha = 0.45) +
+  geom_col(aes(sqrt(direct_recipients)), width = 0.6) +
+  geom_text(aes(sqrt(downstream_orgs), label = paste0(direct_recipients, " / ", downstream_orgs)), hjust = -0.2, size = 2.3) +
+  scale_x_continuous(breaks = sqrt(brk), labels = brk, limits = c(0, xmax_dn), expand = c(0, 0)) +
+  scale_fill_manual(values = pub_group_col, name = "Publisher type") +
+  labs(x = "Direct recipients (dark) and all downstream organisations (light)", y = NULL) + bar_theme +
+  theme(legend.position = "bottom")
+p_dn <- p_dn + guides(fill = guide_legend(override.aes = list(alpha = 1)))
+p_mult <- (p_up | p_mid | p_dn) + plot_layout(widths = c(xmax_up, 9, xmax_dn), guides = "collect") & theme(legend.position = "bottom")
+n_int <- nrow(mult)
+save_fig(p_mult, "fig_new_multipliers", width = 6.5, height = 7, caption = paste0(
+  "Network multipliers: organisations that receive traced funding and pass it on within the same chain. Reports the organisation-level measure '(multiplier)' of Table 4 (Section 3.4; values in Table 7), measured on the organisation paths of the chain level (indicator 6e). ",
+  "An organisation is a multiplier on an organisation path if it is neither the first nor the last organisation on it; ", fmt(n_int),
+  " organisations are multipliers on at least one of the ", fmt(s4$organisation_paths), " organisation paths (all of them in multipliers_all.csv). ",
+  "Shown: the ", nrow(m7), " organisations of Table 7, ordered by the number of organisation paths on which they are multipliers (given under each name, with the IATI organisation type and country of registration). ",
+  "Left: distinct organisations before it on those paths (upstream). Right, on the same scale: distinct organisations right after it (direct recipients, dark) and all organisations after it (downstream, light); labels give direct / downstream. ",
+  "Counts use only the paths on which the organisation is a multiplier, and organisations are identified by their identifier. Bars on a square-root scale. ",
+  "Colour: publisher type group as in Figures 4 and 5. All years. Unit: organisations; organisation paths."),
+  note = paste0("Table 7 and Section 3.4 need updating to the definition now in the pipeline (decided 16 November 2026; docs/methods_decisions.md section 9): ",
+                "counts only on the paths where the organisation is a multiplier, each path once, by identifier. New values are in multipliers_all.csv ",
+                "and wp_numbers.csv (mult_*). The 'McCarthy top 50' column cannot be reproduced from the pipeline (their ranked list is not in the project)."))
+# numbers
+wp_num("mult_n", n_int, "organisations", "all years", "multipliers.csv", "Organisations that are multipliers (intermediaries) on at least one organisation path")
+for (ty in names(s4$multipliers_by_type)) wp_num(paste0("mult_n_", ty), s4$multipliers_by_type[[ty]], "organisations", "all years", "summaries/04_network.json", paste0("Multipliers of IATI organisation type ", ty))
+for (r in c(t7_refs, "UG-NGB-5914-9186", "UG-NGB-5914-252")) {
+  x <- filter(mult, org_ref == r); nm <- clean_name(x$org_name)
+  for (col in c("paths_through", "direct_recipients", "downstream_orgs", "upstream_orgs"))
+    wp_num(paste0("mult_", r, "_", col), x[[col]], if (col == "paths_through") "organisation paths" else "organisations", "all years", "multipliers.csv", paste0(str_replace_all(col, "_", " "), ": ", nm, " (", x$org_country, ")"))
+}
+```
+
+```{r wp-fig05, include = FALSE}
+types5 <- keep$group # from the organisation-level figure: 30+ publishing organisations, ordered by that number
+il5 <- c(`1` = "1. Connected to an activity of another organisation", `2` = "2. Incoming: valid provider identifier",
+         `3` = "3. Outgoing: valid receiver identifier", `4` = "4. Counterpart identifier matches an IATI publisher")
+unit_short <- c(activities = "activities", transactions = "transactions")
+q5 <- ind |> filter(indicator %in% c(names(il5), "2b", "3b"), scope %in% names(sc_lev), group %in% c(types5, "All publishers")) |>
+  select(scope, group, indicator, numerator, denominator, percent, small_base, unit)
+main5 <- q5 |> filter(indicator %in% names(il5)) |>
+  left_join(q5 |> filter(indicator %in% c("2b", "3b")) |> transmute(scope, group, indicator = str_remove(indicator, "b$"), percent_b = percent),
+            by = c("scope", "group", "indicator")) |>
+  mutate(panel = factor(il5[indicator], il5), grp = pub_group(group))
+# Panel titles with the unit of n (Figure 5)
+il5u <- setNames(paste0(il5, "\n(n: ", c("activities", "transactions", "transactions", "transactions"), ")"), names(il5))
+g5 <- main5 |> filter(scope == "global", group != "All publishers") |>
+  mutate(group = factor(group, rev(types5)),
+         shown = !small_base,
+         lab = if_else(shown, paste0(pct_lab(percent), if_else(!is.na(percent_b) & percent_b > 0, paste0(" +", pct_lab(percent_b)), "")), "base below 30"),
+         nlab = paste0("n = ", fmt(denominator)), panel5 = factor(il5u[indicator], il5u),
+         end = if_else(shown, percent + coalesce(percent_b, 0), 0))
+ref5 <- main5 |> filter(scope == "global", group == "All publishers") |> mutate(panel5 = factor(il5u[indicator], il5u))
+p5 <- ggplot(g5, aes(y = group)) +
+  geom_col(aes(x = if_else(shown, percent + coalesce(percent_b, 0), NA_real_), fill = grp), alpha = 0.35, width = 0.68) +
+  geom_col(aes(x = if_else(shown, percent, NA_real_), fill = grp), width = 0.68) +
+  geom_vline(data = ref5, aes(xintercept = percent), linetype = "22", colour = "grey25", linewidth = 0.35) +
+  geom_label(data = ref5, aes(x = percent + 1.5, y = Inf, label = paste0("All publishers ", pct_lab(percent))), vjust = 1, hjust = 0,
+             size = 2, label.size = 0, fill = alpha("white", 0.85), label.padding = unit(0.08, "lines")) +
+  geom_text(aes(x = end, label = lab), hjust = -0.12, size = 2.1) +
+  geom_text(aes(x = 150, label = nlab), hjust = 0, size = 2, colour = "grey35") +
+  facet_wrap(~panel5, ncol = 2) +
+  scale_fill_manual(values = pub_group_col, name = "Publisher type") +
+  scale_x_continuous(limits = c(0, 190), breaks = c(0, 25, 50, 75, 100), labels = \(x) paste0(x, "%"), expand = c(0, 0)) +
+  scale_y_discrete(expand = expansion(add = c(0.6, 1.3))) +
+  labs(x = "Share of the denominator (n, at right; its unit is in the panel title)", y = NULL) +
+  theme_minimal(base_size = 8) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.y = element_blank(),
+        strip.text = element_text(face = "bold", hjust = 0), legend.position = "bottom", panel.spacing.x = unit(5, "mm"))
+small5 <- g5 |> filter(!shown) |> mutate(t = paste0(group, " (indicator ", indicator, ", n = ", denominator, ")"))
+save_fig(p5, "fig05_link_quality_by_type", width = 6.5, height = 6.6, caption = paste0(
+  "Figure 5. Link quality by publisher type, all years. Reports, for each publisher type, the activity-level indicator 1 (Table 4; Section 4.2) and the transaction-level indicators 2, 2b, 3, 3b and 4 (Table 4; Section 5.2), which follow the link quality tests of Table 2 (identified: 2, 2b, 3, 3b; matched: 4; linked: 1). ",
+  "Publisher type: IATI organisation type of the reporting organisation; the ", length(types5), " types with 30 or more publishing organisations, ordered by that number (largest first; the same order in every panel and in the organisation-level figure). ",
+  "Panel 1: activities connected to an activity of another organisation (indicator 1; unit: activities). ",
+  "Panel 2: incoming transactions with a valid provider identifier (indicator 2; unit: transactions); the lighter segment adds those naming a publisher's own identifier outside the codelist (indicator 2b). ",
+  "Panel 3: outgoing commitments and disbursements with a valid receiver identifier (indicator 3; unit: transactions); lighter segment: indicator 3b. ",
+  "Panel 4: counterpart identifiers that match an IATI publisher (indicator 4; unit: transactions). ",
+  "Labels: the indicator, then the 2b or 3b share; n: the denominator, in the unit given in the panel title. Dashed line: all publishers (", paste0(ref5$indicator, ": ", pct_lab(ref5$percent), collapse = "; "), "). ",
+  "Colour: publisher type group as in Figure 4. ",
+  if (nrow(small5)) paste0("Not shown, denominator below 30: ", paste(small5$t, collapse = "; "), ". ") else "",
+  "All years."))
+```
+
+```{r wp-fig05b, include = FALSE}
+y5 <- main5 |> filter(group %in% types5) |>
+  mutate(group = factor(group, rev(types5)), period = factor(sc_lev[scope], sc_lev), shown = !small_base)
+ref5y <- main5 |> filter(group == "All publishers") |> mutate(period = factor(sc_lev[scope], sc_lev))
+p5b <- ggplot(filter(y5, shown), aes(percent, group)) +
+  geom_line(aes(group = group), data = filter(y5, shown, period != "All years"), colour = "grey80", linewidth = 0.4) +
+  geom_point(aes(shape = period), data = filter(y5, shown, period != "All years"), colour = "grey30", size = 1.5, stroke = 0.5) +
+  geom_point(aes(fill = grp), data = filter(y5, shown, period == "All years"), shape = 21, colour = "grey20", size = 2.3, stroke = 0.3) +
+  geom_vline(data = filter(ref5y, period == "All years"), aes(xintercept = percent), linetype = "22", colour = "grey25", linewidth = 0.35) +
+  facet_wrap(~panel, ncol = 2) +
+  scale_fill_manual(values = pub_group_col, name = "Publisher type (all years)") +
+  scale_shape_manual(values = yr_shape[-1], name = "Year (by transaction date)") +
+  scale_x_continuous(limits = c(0, 100), labels = \(x) paste0(x, "%")) +
+  labs(x = "Share of the denominator", y = NULL) +
+  theme_minimal(base_size = 8) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.y = element_line(colour = "grey93"),
+        strip.text = element_text(face = "bold", hjust = 0), legend.position = "bottom", legend.box = "vertical",
+        legend.spacing.y = unit(0.5, "mm"))
+small5y <- y5 |> filter(!shown) |> mutate(t = paste0(group, " ", period, " (indicator ", indicator, ")"))
+# Note for the text: types whose value in every year 2023-2025 is above (or below) their all-years value
+cmp5 <- y5 |> filter(shown) |> group_by(indicator, group) |>
+  summarise(all = percent[period == "All years"][1], lo = min(percent[period != "All years"]), hi = max(percent[period != "All years"]),
+            ny = sum(period != "All years"), .groups = "drop") |> filter(ny == 3)
+side5 <- \(code, above) cmp5 |> filter(indicator == code, if (above) lo > all else hi < all) |>
+  mutate(t = paste0(group, " (", pct_lab(all), " all years; ", pct_lab(lo), " to ", pct_lab(hi), " in 2023-2025)")) |> pull(t)
+note5b <- paste0("Add a sentence in Section 4.2 (indicator 1) and Section 5.2 (indicators 2 to 4) on how recent years differ from all years. The difference runs in both directions: ",
+  "for indicators 1, 3 and 4 several publisher types score higher in each of 2023, 2024 and 2025 than across all years (recent linking practice is better than the all-years value suggests), ",
+  "while for indicators 2 and 3 other types score lower in every recent year (fewer of their recent transactions identify the counterpart). Listed below: types where all three years lie on the same side of the all-years value. ",
+  "Indicator 1, every recent year above all years: ", paste(side5("1", TRUE), collapse = "; "), ". ",
+  "Indicator 3, every recent year above all years: ", paste(side5("3", TRUE), collapse = "; "), ". ",
+  "Indicator 4, every recent year above all years: ", paste(side5("4", TRUE), collapse = "; "), ". ",
+  "Exceptions, every recent year below all years: indicator 2: ", paste(side5("2", FALSE), collapse = "; "), "; indicator 3: ", paste(side5("3", FALSE), collapse = "; "), ".")
+save_fig(p5b, "fig05b_link_quality_by_type_by_year", width = 6.5, height = 6.4, caption = paste0(
+  "Figure 5b. Link quality by publisher type and year: the Table 4 indicators 1 (Section 4.2), 2, 3 and 4 (Section 5.2) as in Figure 5, by year, for transactions dated 2023, 2024 and 2025 (open symbols; for indicator 1, activities with a transaction in the year) ",
+  "and for all years (filled circle, coloured by publisher type group). Publisher types and order as in Figure 5. Dashed line: all publishers, all years. ",
+  "2b and 3b are not shown by year (values in wp_numbers.csv). Units: indicator 1, activities; indicators 2 to 4, transactions. ",
+  if (nrow(small5y)) paste0("Not shown, denominator below 30: ", paste(small5y$t, collapse = "; "), ".") else ""),
+  note = note5b)
+for (i in seq_len(nrow(main5))) {
+  r <- main5[i, ]; sc <- sc_lev[[r$scope]] |> str_replace("All years", "all years")
+  k <- paste0("fig5_ind", r$indicator, "_", r$group, "_", sc)
+  wp_num(k, r$percent, "%", sc, "indicators.csv", paste0("Indicator ", r$indicator, ", ", r$group, if (r$small_base) " (base below 30)" else ""))
+  wp_num(paste0(k, "_den"), r$denominator, r$unit, sc, "indicators.csv", paste0("Indicator ", r$indicator, " denominator, ", r$group))
+  if (!is.na(r$percent_b)) wp_num(paste0("fig5_ind", r$indicator, "b_", r$group, "_", sc), r$percent_b, "%", sc, "indicators.csv", paste0("Indicator ", r$indicator, "b, ", r$group))
+}
+```
+
+```{r wp-ind4-2025, include = FALSE}
+source("indicator4_2025_check.R")
+f4 <- head(i4_rank, 10) |> select(org_name, publisher_group, mix, rate, contrib) |>
+  mutate(lab = paste0(wrap_name(org_name, 34), " (", publisher_group, ")"), lab = factor(lab, rev(lab))) |>
+  pivot_longer(c(mix, rate), names_to = "part") |>
+  mutate(part = factor(part, c("mix", "rate"), c("Share of the denominator changed (mix)", "Own rate changed (rate)")))
+p4c <- ggplot(f4, aes(value, lab, fill = part)) +
+  geom_col(width = 0.65) +
+  geom_vline(xintercept = 0, colour = "grey30", linewidth = 0.3) +
+  geom_point(data = distinct(f4, lab, contrib), aes(contrib, lab), inherit.aes = FALSE, shape = 21, fill = "white", size = 1.8) +
+  geom_text(data = distinct(f4, lab, contrib), aes(contrib, lab, label = formatC(contrib, format = "f", digits = 2), hjust = if_else(contrib < 0, 1.4, -0.4)),
+            inherit.aes = FALSE, size = 2.2) +
+  scale_fill_manual(values = c("grey55", one), name = NULL) +
+  scale_x_continuous(expand = expansion(mult = 0.18)) +
+  labs(x = "Contribution to the change in indicator 4, 2024 to 2025 (percentage points)", y = NULL) +
+  theme_minimal(base_size = 8) + theme(panel.grid.minor = element_blank(), panel.grid.major.y = element_blank(), legend.position = "bottom")
+if (concentrated) save_fig(p4c, "fig_new_ind4_2025", width = 6.5, height = 4, caption = paste0(
+  "Indicator 4 in 2025: the ten publishers that contribute most to the change. Indicator 4 (Table 4, transaction level, Section 5.2: counterpart identifiers that match an IATI publisher) is ",
+  pct_lab(i4_summary$rate_to), " for transactions dated 2025 against ", pct_lab(i4_summary$rate_from), " for 2024 (", formatC(i4_change, format = "f", digits = 2), " points). ",
+  "Each publisher's contribution (circle and label, percentage points) is its matched transactions as a share of all transactions in the denominator in 2025 minus the same for 2024; the contributions of all publishers add up to the change. ",
+  "Bars split it into the part due to a change in the publisher's share of the denominator (mix, grey) and the part due to a change in its own rate (rate, blue). ",
+  "The four largest contributions make up ", pct_lab(100 * i4_summary$top4 / i4_change), " of the change. Years by transaction date. Unit: transactions; percentage points. Method and full table: docs/indicator4_2025_check.md."),
+  note = paste0("Section 5.2 placeholder on indicator 4 in 2025: replace with the result in docs/indicator4_2025_check.md. In short: the four largest contributions (",
+                paste(i4_rank$org_name[1:4], collapse = ", "), ") make up ", pct_lab(100 * i4_summary$top4 / i4_change), " of the change, mostly because these publishers have far fewer transactions dated 2025; ",
+                "across all publishers the change is ", pct_lab(100 * i4_summary$mix / i4_change), " mix and ", pct_lab(100 * i4_summary$rate / i4_change), " rate. Part may be reporting lag (CC-10)."))
+for (k in names(i4_summary)) wp_num(paste0("ind4_2025_", k), round(i4_summary[[k]], 3),
+                                    if (k %in% c("n_pub", "n_neg", "n_pos")) "publishers" else if (k %in% c("D_from", "D_to")) "transactions" else if (str_detect(k, "^rate_")) "%" else "percentage points",
+                                    if (str_detect(k, "from")) "2024" else if (str_detect(k, "_to$")) "2025" else "2024 to 2025", "indicators_by_publisher.csv",
+                                    paste0("Indicator 4, 2024 to 2025 breakdown by publisher: ", k))
+for (i in 1:10) { r <- i4_rank[i, ]
+  wp_num(paste0("ind4_2025_top", i, "_contribution"), round(r$contrib, 3), "percentage points", "2024 to 2025", "indicators_by_publisher.csv", paste0("Contribution to the change in indicator 4, rank ", i, ": ", r$org_name, " (", r$reporting_org_ref, ")")) }
+```
+
+```{r wp-fig06, include = FALSE}
+dep <- rd("depth_by_scope.csv") |> filter(origin_group == "All publishers", scope %in% names(sc_lev))
+unit_lab <- c(chains = "Per chain", `origins (longest chain)` = "Per origin (its longest chain)", `organisation paths` = "Per organisation path")
+unit_n <- c(chains = "chains", `origins (longest chain)` = "origins", `organisation paths` = "organisation paths")
+unit_step <- c(chains = "one step = one link\nbetween two activities", `origins (longest chain)` = "one step = one link\nbetween two activities",
+               `organisation paths` = "one step = one step from one\norganisation to the next")
+dep <- dep |> mutate(period = factor(sc_lev[scope], sc_lev), steps = factor(steps, c("1", "2", "3", "4+")))
+dep_n <- dep |> group_by(scope, period, unit) |> summarise(n = sum(n), .groups = "drop")
+d6 <- dep |> filter(scope == "global") |>
+  mutate(title = paste0(unit_lab[unit], "\n(n = ", fmt(dep_n$n[match(paste("global", unit), paste(dep_n$scope, dep_n$unit))]), " ", unit_n[unit], ")\n", unit_step[unit]),
+         title = factor(title, unique(title[order(match(unit, names(unit_lab)))])))
+p6 <- ggplot(d6, aes(steps, percent)) +
+  geom_col(fill = one, width = 0.7) +
+  geom_text(aes(label = paste0(pct_lab(percent), "\n(", fmt(n), ")")), vjust = -0.25, size = 2.4, lineheight = 0.9) +
+  facet_wrap(~title, nrow = 1) +
+  scale_y_continuous(limits = c(0, 118), breaks = c(0, 25, 50, 75, 100), labels = \(x) paste0(x, "%"), expand = c(0, 0)) +
+  labs(x = "Steps", y = "Share of the unit") +
+  theme_minimal(base_size = 8) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank(), strip.text = element_text(hjust = 0, size = 7.5, lineheight = 1),
+        strip.clip = "off", plot.margin = margin(4, 8, 4, 4))
+ind6 <- \(code, sc = "global", col = "percent") g(code, sc)[[col]]
+save_fig(p6, "fig06_chain_depth", width = 6.5, height = 3.6, caption = paste0(
+  "Figure 6. Chain depth in three units (Table 10): the chain-level indicators of Table 4 (Section 6.2). Left: chains by number of steps (indicators 6c, longest chain, ", ind6("6c", col = "value"),
+  " steps, and 6d, chains with 2 or more steps, ", pct_lab(ind6("6d")), "). Centre: origins by the steps of their longest chain (indicators 6, mean ", ind6("6", col = "value"),
+  " steps, and 6b, ", pct_lab(ind6("6b")), " with 2 or more steps). Right: distinct organisation paths by number of steps (indicator 6e, ", pct_lab(ind6("6e")), " with 2 or more steps). ",
+  "Labels: share of the unit, with the count in brackets. Global network, all years. Units: chains; origins; organisation paths."))
+```
+
+```{r wp-fig06b, include = FALSE}
+unit_short6 <- c(chains = "Per chain", `origins (longest chain)` = "Per origin", `organisation paths` = "Per organisation path")
+d6b <- dep |> mutate(unit = factor(unit_short6[unit], unit_short6), cell = factor(paste0(unit, "\n", steps, if_else(steps == "1", " step", " steps"))))
+d6b$cell <- factor(d6b$cell, unique(d6b$cell[order(d6b$unit, d6b$steps)]))
+per_col <- c(`All years` = "grey40", `2023` = "#9ecae1", `2024` = "#4a90d9", `2025` = "#1d4f91")
+p6b <- ggplot(d6b, aes(period, percent, fill = period)) +
+  geom_col(width = 0.75) +
+  geom_text(aes(label = pct_lab(percent)), vjust = -0.3, size = 1.9) +
+  facet_wrap(~cell, ncol = 4, scales = "free_y") +
+  scale_fill_manual(values = per_col, name = NULL) +
+  scale_y_continuous(labels = \(x) paste0(x, "%"), expand = expansion(mult = c(0, 0.25))) +
+  labs(x = NULL, y = "Share of the unit") +
+  theme_minimal(base_size = 7.5) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank(), axis.text.x = element_blank(),
+        strip.text = element_text(hjust = 0, face = "bold", size = 6.8), legend.position = "bottom")
+n6y <- dep_n |> filter(scope != "global") |> group_by(period) |>
+  summarise(t = paste0(period[1], ": ", paste0(fmt(n), " ", unit_n[unit], collapse = ", ")), .groups = "drop") |> pull(t)
+save_fig(p6b, "fig06b_chain_depth_by_year", width = 6.5, height = 5.2, caption = paste0(
+  "Figure 6b. Chain depth in three units, by year: the indicators of Figure 6 (Table 4, chain level, Section 6.2) for the chains that pass through at least one activity with a transaction dated in the year, ",
+  "and the origins and organisation paths of those chains. Each small panel is one unit and number of steps (rows: per chain, per origin by its longest chain, per organisation path); bars: all years and 2023, 2024, 2025. ",
+  "The vertical scale differs between panels. n: ", paste(n6y, collapse = "; "), ". Units: chains; origins; organisation paths."))
+# Table 11 values, and the depth numbers
+t11 <- ind |> filter(indicator %in% c("6", "6b", "6c", "6d", "6e", "6f"), group == "All publishers", scope %in% names(sc_lev)) |>
+  transmute(indicator, name, unit, period = sc_lev[scope], value = coalesce(percent, value), numerator, denominator)
+write_csv(t11 |> select(-numerator, -denominator) |> pivot_wider(names_from = period, values_from = value), file.path(wp_dir, "table11_chain_indicators.csv"), na = "")
+.notes[["table11"]] <- paste0("Table 11 (Section 6.2): add the year values of 6b (origins whose longest chain has 2+ steps: ",
+  paste0(t11$period[t11$indicator == "6b"], " ", pct_lab(t11$value[t11$indicator == "6b"]), collapse = "; "), ") and 6c (longest chain: ",
+  paste0(t11$period[t11$indicator == "6c"], " ", t11$value[t11$indicator == "6c"], " steps", collapse = "; "), "). Full table: figures/wp/table11_chain_indicators.csv.")
+.captions[["table11"]] <- "Table 11. Chain-level indicators of Table 4 (6, 6b, 6c, 6d, 6e; Section 6.2), and the tentative indicator 6f (mean chain completeness score; may be removed, see the note on completeness_by_steps), all publishers, all years and 2023 to 2025 (chains passing through an activity with a transaction dated in the year). Units: origins (6, 6b), chains (6c, 6d, 6f), organisation paths (6e)."
+for (i in seq_len(nrow(t11))) { r <- t11[i, ]; sc <- if (r$period == "All years") "all years" else r$period
+  if (!(r$indicator %in% c("6", "6d", "6e") & sc %in% c("all years", "2023", "2024", "2025") & paste0("ind", r$indicator, "_", sc) %in% .wp_numbers$key))
+    wp_num(paste0("t11_ind", r$indicator, "_", sc), r$value, if (r$indicator %in% c("6", "6c")) "steps" else if (r$indicator == "6f") "score (0 to 1)" else "%", sc, "indicators.csv", paste0("Table 11: indicator ", r$indicator, " (", r$name, ")"))
+  if (!is.na(r$numerator)) wp_num(paste0("t11_ind", r$indicator, "_", sc, "_num"), r$numerator, r$unit, sc, "indicators.csv", paste0("Table 11: indicator ", r$indicator, " numerator"))
+  wp_num(paste0("t11_ind", r$indicator, "_", sc, "_den"), r$denominator, r$unit, sc, "indicators.csv", paste0("Table 11: indicator ", r$indicator, " denominator"))
+}
+for (i in seq_len(nrow(dep))) { r <- dep[i, ]; sc <- if (r$scope == "global") "all years" else as.character(r$period)
+  if (sc != "all years") { # all years are recorded in CC-01 (depth_*)
+    wp_num(paste0("fig6b_", r$unit, "_", r$steps, "_", sc), r$n, unit_n[[r$unit]], sc, "depth_by_scope.csv", paste0("Figure 6b: ", unit_n[[r$unit]], " with ", r$steps, " steps"))
+    wp_num(paste0("fig6b_", r$unit, "_", r$steps, "_", sc, "_pct"), r$percent, "%", sc, "depth_by_scope.csv", paste0("Figure 6b: share of ", unit_n[[r$unit]], " with ", r$steps, " steps")) } }
+```
+
+```{r wp-fig08, include = FALSE}
+end_grp <- c(`link only to own organisation or implausible` = "Receiver identified", `activity ID given but not published` = "Receiver identified",
+             `organisation ID given as activity ID` = "Receiver identified", `receiver organisation ID only` = "Receiver identified",
+             `receiver name only` = "Receiver named only", `outgoing only to itself` = "No receiver information",
+             `no receiver named` = "No receiver information", `no outgoing transactions` = "No receiver information")
+grp_lev8 <- c("Receiver identified", "Receiver named only", "No receiver information")
+grp_col8 <- setNames(c("#1d4f91", "#4a90d9", "grey65"), grp_lev8)
+ends_all <- rd("chain_end_reasons.csv")
+stopifnot("End reasons differ from stage 4" = setequal(unique(ends_all$end_reason), names(end_grp)))
+e8 <- ends_all |> mutate(end_reason = factor(end_reason, rev(names(end_grp))), grp = factor(end_grp[as.character(end_reason)], grp_lev8),
+                         panel = factor(scope, c("chain ends (in network)", "all receiving activities"),
+                                        c(paste0("A. Chain ends in the network\n(n = ", fmt(sum(ends_all$activities[ends_all$scope == "chain ends (in network)"])), " activities)"),
+                                          paste0("B. All activities that receive funds\n(n = ", fmt(sum(ends_all$activities[ends_all$scope == "all receiving activities"])), " activities)"))))
+p8 <- ggplot(e8, aes(percent, end_reason, fill = grp)) +
+  geom_col(width = 0.68) +
+  geom_text(aes(label = paste0(pct_lab(percent), " (", fmt(activities), ")")), hjust = -0.08, size = 2.3) +
+  facet_grid(grp ~ panel, scales = "free_y", space = "free_y", switch = "y") +
+  scale_fill_manual(values = grp_col8, guide = "none") +
+  scale_x_continuous(limits = c(0, 85), breaks = c(0, 25, 50), labels = \(x) paste0(x, "%"), expand = c(0, 0)) +
+  labs(x = "Share of activities", y = NULL) +
+  theme_minimal(base_size = 8) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.y = element_blank(), strip.placement = "outside",
+        strip.text.y.left = element_text(angle = 0, hjust = 1, face = "bold", size = 7), strip.text.x = element_text(hjust = 0, face = "bold"),
+        panel.spacing.y = unit(3, "mm"))
+named_any <- sum(e8$percent[e8$panel == levels(e8$panel)[1] & e8$end_reason %in% c("receiver name only", "receiver organisation ID only")])
+save_fig(p8, "fig08_chain_ends", width = 6.5, height = 4.4, caption = paste0(
+  "Figure 8. Why chains stop (Section 6.3). For each activity that receives funds but has no onward link in the network, the best evidence its outgoing commitments, disbursements and expenditure give about the next receiver; ",
+  "each activity is counted once, under the best evidence. The reasons follow the levels of Table 2 and are ordered from most to least information, in three groups: ",
+  "receiver identified (an organisation identifier or an activity identifier is given; for the activity identifiers that do not resolve see indicators x1 and x1b of Table 4, Section 5.4), ",
+  "receiver named only (the 'named' level of Table 2), and no receiver information. A: activities where a chain in the network ends; B: all activities that receive funds, in the network or not. ",
+  "Labels: share, with the number of activities in brackets. All years. Unit: activities."),
+  note = paste0("Section 6.3: in ", pct_lab(named_any), " of chain ends the next organisation is already named, by name or identifier (Figure 8A, the 'receiver named only' and 'receiver organisation ID only' rows); this is where adding identifiers (indicator 3) would extend chains."))
+```
+
+```{r wp-fig08b, include = FALSE}
+ey <- rd("chain_end_reasons_by_year.csv") |> mutate(period = factor(sc_lev[scope], sc_lev)) |>
+  bind_rows(ends_all |> mutate(group = scope, scope = "global", period = factor("All years", sc_lev))) |>
+  mutate(end_reason = factor(end_reason, rev(names(end_grp))), grp = factor(end_grp[as.character(end_reason)], grp_lev8),
+         panel = factor(group, c("chain ends (in network)", "all receiving activities"), c("A. Chain ends in the network", "B. All activities that receive funds")))
+p8b <- ggplot(ey, aes(percent, end_reason)) +
+  geom_line(aes(group = end_reason), data = filter(ey, period != "All years"), colour = "grey80", linewidth = 0.4) +
+  geom_point(aes(shape = period), data = filter(ey, period != "All years"), colour = "grey30", size = 1.5, stroke = 0.5) +
+  geom_point(aes(fill = grp), data = filter(ey, period == "All years"), shape = 21, colour = "grey20", size = 2.3, stroke = 0.3) +
+  facet_grid(grp ~ panel, scales = "free_y", space = "free_y", switch = "y") +
+  scale_fill_manual(values = grp_col8, guide = "none") +
+  scale_shape_manual(values = yr_shape[-1], name = "Year") +
+  scale_x_continuous(limits = c(0, NA), labels = \(x) paste0(x, "%")) +
+  labs(x = "Share of activities", y = NULL) +
+  theme_minimal(base_size = 8) +
+  theme(panel.grid.minor = element_blank(), strip.placement = "outside", strip.text.y.left = element_text(angle = 0, hjust = 1, face = "bold", size = 7),
+        strip.text.x = element_text(hjust = 0, face = "bold"), legend.position = "bottom", panel.spacing.y = unit(3, "mm"))
+ny8 <- ey |> filter(period != "All years") |> group_by(period, group) |> summarise(n = sum(activities), .groups = "drop") |>
+  group_by(period) |> summarise(t = paste0(period[1], ": ", fmt(n[group == "chain ends (in network)"]), " chain ends, ", fmt(n[group == "all receiving activities"]), " receiving activities")) |> pull(t)
+save_fig(p8b, "fig08b_chain_ends_by_year", width = 6.5, height = 4.6, caption = paste0(
+  "Figure 8b. Why chains stop, by year (Section 6.3): the reasons of Figure 8 for the activities with at least one transaction dated in 2023, 2024 or 2025 (open symbols; year by transaction date), and for all years (filled circle, coloured by group as in Figure 8). ",
+  "The reason is judged on all of an activity's outgoing transactions. n: ", paste(ny8, collapse = "; "), ". Unit: activities."),
+  note = with(list(v = \(r, p) ey$percent[ey$group == "chain ends (in network)" & ey$end_reason == r & ey$period == p]), paste0(
+    "Section 6.3: recent chain ends name the receiver less often. 'Receiver name only' is ", pct_lab(v("receiver name only", "All years")), " of chain ends across all years but ",
+    pct_lab(v("receiver name only", "2023")), ", ", pct_lab(v("receiver name only", "2024")), " and ", pct_lab(v("receiver name only", "2025")), " in 2023, 2024 and 2025; ",
+    "'no receiver named' rises from ", pct_lab(v("no receiver named", "All years")), " (all years) to ", pct_lab(v("no receiver named", "2023")), ", ", pct_lab(v("no receiver named", "2024")),
+    " and ", pct_lab(v("no receiver named", "2025")), ". Part of this may be reporting lag (outgoing transactions not yet published; CC-10).")))
+for (i in which(ey$period != "All years")) { r <- ey[i, ]; sc <- as.character(r$period); gk <- if (r$group == "chain ends (in network)") "ends" else "allrec"
+  wp_num(paste0("fig8b_", gk, "_", r$end_reason, "_", sc), r$activities, "activities", sc, "chain_end_reasons_by_year.csv", paste0("Why chains stop (", r$group, "), ", r$end_reason))
+  wp_num(paste0("fig8b_", gk, "_", r$end_reason, "_", sc, "_pct"), r$percent, "%", sc, "chain_end_reasons_by_year.csv", paste0("Share (", r$group, "), ", r$end_reason)) }
+```
+
+```{r wp-completeness, include = FALSE}
+chains_all <- rd("chains.csv") |> mutate(st = factor(if_else(steps >= 4, "4+", as.character(steps)), c("1", "2", "3", "4+")))
+comp_dist <- chains_all |> group_by(st) |>
+  summarise(chains = n(), mean = mean(completeness), median = median(completeness), p25 = quantile(completeness, 0.25), p75 = quantile(completeness, 0.75),
+            score_1 = sum(completeness == 1), score_1_pct = 100 * mean(completeness == 1), .groups = "drop")
+write_csv(comp_dist |> mutate(across(c(mean, median, p25, p75), \(x) round(x, 3)), score_1_pct = round(score_1_pct, 1)), file.path(wp_dir, "completeness_by_steps.csv"))
+steps_all <- rd("chain_steps.csv")
+pt_share <- colMeans(steps_all[c("receiver_ref_well_formed", "funder_names_activity", "receiver_confirms")]) * 100
+for (i in seq_len(nrow(comp_dist))) { r <- comp_dist[i, ]
+  for (k in c("chains", "mean", "median", "p25", "p75", "score_1", "score_1_pct"))
+    wp_num(paste0("completeness_", r$st, "_", k), round(r[[k]], if (k %in% c("chains", "score_1")) 0 else 3), if (k %in% c("chains", "score_1")) "chains" else if (k == "score_1_pct") "%" else "score (0 to 1)",
+           "all years", "chains.csv", paste0("Chain completeness score, chains of ", r$st, " steps: ", k)) }
+for (k in names(pt_share)) wp_num(paste0("completeness_steps_", k, "_pct"), round(pt_share[[k]], 1), "%", "all years", "chain_steps.csv", paste0("Share of chain steps with the point: ", k))
+tent6f <- "TENTATIVE, may be removed: the IATI Data Quality Dashboard already reports a different completeness measure"
+.captions[["completeness_by_steps"]] <- paste0("Table (new). Chain completeness score by number of steps: chains, mean, median, quartiles, and chains scoring 1. The score is the tentative chain-level indicator 6f (Section 6.1; proposed for this paper; ", tent6f, "). ",
+  "Indicator 6f, mean score over chains: ", paste0(c("all years", "2023", "2024", "2025"), " ", sapply(c("global", "all_2023", "all_2024", "all_2025"), \(x) g("6f", x)$value), collapse = "; "), ". All years unless stated. Unit: chains. ",
+  "Across all ", fmt(nrow(steps_all)), " chain steps, ", pct_lab(pt_share[["receiver_confirms"]]), " are confirmed by the receiver, ", pct_lab(pt_share[["funder_names_activity"]]), " name the receiver's activity in the funder's data and ",
+  pct_lab(pt_share[["receiver_ref_well_formed"]]), " give a well-formed receiver identifier in the funder's data.")
+.notes[["completeness_by_steps"]] <- paste0("Section 6.1 placeholder on the completeness score: the formula is now computed (docs/methods_decisions.md section 9; docs/indicators.md). Say that it was proposed for this paper with reference to the fields traced by EyeOpenerWorks and Open Works (2020), and that the formula itself is new. ",
+  "Main result: most steps earn only the receiver's point (receivers confirm ", pct_lab(pt_share[["receiver_confirms"]]), " of steps; funders name the receiver's activity on ", pct_lab(pt_share[["funder_names_activity"]]),
+  "), so no chain of 3 or more steps scores 1 (best: ", max(chains_all$completeness[chains_all$steps >= 3]), "). ",
+  "The score is now the TENTATIVE indicator 6f (mean over chains; ", g("6f")$value, " for all years). Decide whether to keep it: the IATI Data Quality Dashboard already reports a different completeness measure, and the paper should not add indicators that do not follow existing methodologies. ",
+  "If kept: add 6f to Table 4 (chain level) and Annex A.7, marked tentative, and consider a name without 'completeness'. If removed: drop the score from Section 6.1, Figure 7, the chain diagrams (the numbers above the arrows) and the case pair (CC-09).")
+```
+
+```{r wp-fig07, include = FALSE}
+fig7_path <- rd("org_paths.csv") |> slice_max(steps, n = 1, with_ties = FALSE)
+st7 <- path_steps_of(fig7_path$org_path_id)
+ch7 <- filter(chains_all, chain_id == st7$chain_id[1])
+p7 <- chain_diagram(st7, stop_note = paste("chain stops:", ch7$end_reason), name_width = 14, text_size = 2.1)
+save_fig(p7, "fig07_longest_path", width = 6.5, height = 2.6, caption = paste0(
+  "Figure 7. The longest organisation path (", fig7_path$steps, " steps; indicator 6c of Table 4, Section 6.2), drawn through its most complete chain (chain ", ch7$chain_id, ", completeness score ", ch7$completeness,
+  "; years ", ch7$years, "). ", fmt(sum(st7$evidence == "confirmed")), " of its ", nrow(st7), " steps are confirmed by both sides. ", chain_caption_key(), "Unit: organisations; activity links."),
+  note = paste0("Section 6.2 text on Figure 7: the steps labelled 'affiliates' join affiliates of one organisation (", paste(Filter(Negate(is.na), mapply(\(a, b) if (is_affiliate(a, b)) paste(clean_name(a), "and", clean_name(b)) else NA,
+    head(c(st7$from_org_name[1], st7$to_org_name), -1), st7$to_org_name)), collapse = "; "), "); they are real transfers between separately registered organisations but not steps towards local delivery."))
+for (i in seq_len(nrow(st7))) wp_num(paste0("fig7_step", i, "_points"), st7$step_points[i], "points (0 to 3)", "all years", "chain_steps.csv", paste0("Figure 7 step ", i, ": ", clean_name(st7$from_org_name[i]), " to ", clean_name(st7$to_org_name[i]), " (", st7$evidence[i], ")"))
+wp_num("fig7_completeness", ch7$completeness, "score (0 to 1)", "all years", "chains.csv", "Figure 7: completeness score of the chain drawn")
+```
+
+```{r wp-fig-example-chains, include = FALSE}
+ex_json <- fromJSON(file.path(out, "examples", "example_chains.json"), simplifyVector = FALSE)
+edges_all <- rd_pq("activity_edges.parquet", col_select = c(from_activity, to_activity, from_org, from_org_name, to_org, to_org_name, evidence, plausible))
+ex_plots <- list()
+for (i in seq_along(ex_json)) {
+  e <- ex_json[[i]]
+  cid <- e$chain$chain_id
+  if (!is.null(cid)) {
+    st <- chain_steps_of(as.integer(cid)); ch <- filter(chains_all, chain_id == as.integer(cid))
+    note <- paste("chain stops:", ch$end_reason); cap_extra <- paste0("Chain ", cid, ", ", ch$steps, " step(s), completeness score ", ch$completeness, ", years ", ch$years, ". ")
+  } else { # a link that is not part of a chain (the implausible example): drawn from activity_edges.parquet
+    acts <- tibble(from_activity = map_chr(e$steps, "from_activity"), to_activity = map_chr(e$steps, "to_activity"))
+    st <- acts |> left_join(edges_all, by = c("from_activity", "to_activity")) |> mutate(step = row_number(), evidence = if_else(plausible, evidence, "implausible"))
+    note <- NULL; cap_extra <- "Not a chain in the network: an implausible link is set aside before chains are built (Annex A.4). "
+  }
+  ex_plots[[i]] <- chain_diagram(st, stop_note = note, name_width = 15, text_size = 2.2)
+  save_fig(ex_plots[[i]], paste0("fig_new_example_chain_", i), width = 6.5, height = 2.6, caption = paste0(
+    "Example chain ", i, ": ", e$kind, " (example_chains.json; chosen by report/example_chains.py: ", e$why_chosen, "). ", cap_extra,
+    "Relates to the chain-level indicators of Table 4 (Section 6.2) and Table 2's link quality levels. ", chain_caption_key(!is.null(cid)), "Unit: organisations; activity links."))
+}
+```
+
+```{r wp-fig-counter-example, include = FALSE}
+ctr <- rd("geo_chains.csv") |> filter(counterexample)
+st_c <- chain_steps_of(ctr$chain_id[1]); ch_c <- filter(chains_all, chain_id == ctr$chain_id[1])
+p_ctr <- chain_diagram(st_c, stop_note = paste0("chain stops: ", ch_c$end_reason, "; end activity: ", ctr$end_problem[1]), name_width = 15, text_size = 2.2)
+save_fig(p_ctr, "fig_new_counter_example_chain", width = 6.5, height = 2.6, caption = paste0(
+  "Counter-example chain (Figure 14; Section 7.4): chain ", ch_c$chain_id, ", ", ch_c$steps, " steps, completeness score ", ch_c$completeness, ", years ", ch_c$years,
+  ". The best-ranked chain of two or more steps whose end activity has no usable location point (selection rule in Annex A.8). ", chain_caption_key(), "Unit: organisations; activity links."))
+wp_num("counter_example_completeness", ch_c$completeness, "score (0 to 1)", "all years", "chains.csv", "Counter-example chain: completeness score")
+```
+
+```{r wp-case-pair, include = FALSE}
+cp <- fromJSON(file.path(wp_dir, "case_pair.json"), simplifyVector = TRUE)
+stopifnot("Run report/case_pair.py: no case pair selected" = cp$result == "pair found")
+cp_steps <- \(k) as_tibble(cp[[k]]$steps_detail)
+reason_txt <- c(`receiver name only` = "the next receiver is named, with no identifier",
+                `activity ID given but not published` = "an activity identifier is given but not published")
+pA <- chain_diagram(cp_steps("traceable"), stop_note = paste("chain stops:", cp$traceable$end_reason), name_width = 15, text_size = 2.1)
+pB <- chain_diagram(cp_steps("broken"), stop_note = paste0("chain stops: ", reason_txt[[cp$broken$end_reason]]), name_width = 15, text_size = 2.1)
+grp_cp <- union(as.character(pA$layers[[2]]$data$grp), as.character(pB$layers[[2]]$data$grp))
+pB <- chain_diagram(cp_steps("broken"), stop_note = paste0("chain stops: ", reason_txt[[cp$broken$end_reason]]), name_width = 15, text_size = 2.1, fill_levels = grp_cp)
+p_cp <- (pA + theme(legend.position = "none")) / pB + plot_annotation(tag_levels = "A") &
+  theme(plot.tag = element_text(face = "bold", size = 9))
+val <- \(k) if (is.null(cp[[k]]$origin_value) || is.na(cp[[k]]$origin_value)) "no commitments or disbursements reported" else paste(cp[[k]]$currency, fmt(cp[[k]]$origin_value), cp[[k]]$value_type)
+save_fig(p_cp, "fig_new_case_pair", width = 6.5, height = 5, caption = paste0(
+  "A traceable and a broken chain in the same sector and recipient country (Section 1.4 and Figure 2; chain-level indicators of Table 4, Section 6). Sector: DAC ", cp$sector,
+  " (activity-level sector of each chain's origin activity); country: ", cp$country, ". ",
+  "A: the most traceable chain under the selection rule (chain ", cp$traceable$chain_id, ", ", cp$traceable$steps, " steps, ", cp$traceable$n_confirmed_steps,
+  " confirmed by both sides, completeness score ", cp$traceable$completeness, ", years ", cp$traceable$years, "; origin value: ", val("traceable"), "). ",
+  "B: a chain from the same sector that reaches the same country but stops where ", reason_txt[[cp$broken$end_reason]], " (chain ", cp$broken$chain_id, ", ", cp$broken$steps,
+  " step(s), completeness score ", cp$broken$completeness, ", years ", cp$broken$years, "; origin value: ", val("broken"), "). ",
+  "Selection rule (report/case_pair.py): A has 3 or more steps, a completeness score of at least ", cp$parameters$NEAR_ONE,
+  " (no such chain reaches 1), ends at a national or local implementer, and starts preferably at the Netherlands MFA or UK FCDO; B has the same sector and country, stops at a name-only receiver or an unpublished activity identifier, ",
+  "and has the largest origin value (in its own currency, never converted). ", chain_caption_key(), "Unit: organisations; activity links."),
+  note = paste0("Figure 2 placeholder (Section 1.4): this data-based pair can replace the conceptual diagram. ",
+                "The traceable chain (A) is also the first example chain of Section 7 (Figures 13 and 14 use the same selection). ",
+                "Name the sector in the text (DAC codelist: ", cp$sector, "). The completeness score shown is the tentative indicator 6f; if 6f is removed, select A by confirmed steps instead (case_pair.py, NEAR_ONE)."))
+for (k in c("traceable", "broken")) for (f in c("chain_id", "steps", "completeness", "n_confirmed_steps", "origin_value"))
+  if (!is.null(cp[[k]][[f]]) && !is.na(cp[[k]][[f]])) wp_num(paste0("case_pair_", k, "_", f), cp[[k]][[f]], if (f == "origin_value") cp[[k]]$currency else if (f == "completeness") "score (0 to 1)" else if (f == "steps" || f == "n_confirmed_steps") "steps" else "id",
+                                                                  cp$country, "figures/wp/case_pair.json (report/case_pair.py)", paste0("Case pair, ", k, " chain: ", f))
+wp_num("case_pair_broken_candidates", cp$tried$broken_candidates[nrow(cp$tried)], "chains", cp$country, "figures/wp/case_pair.json (report/case_pair.py)", "Broken chains meeting B1-B4 for the selected traceable chain")
+```
+
+```{r wp-reporting-lag, include = FALSE}
+source("reporting_lag_check.R")
+for (i in seq_len(nrow(lag))) { r <- lag[i, ]; Y <- as.character(r$year)
+  for (k in c("ind1", "ind5", "ind7b")) {
+    code <- sub("ind", "", k)
+    wp_num(paste0("lag_", k, "_", Y, "_now"), round(r[[paste0(k, "_base")]], 1), "%", Y, "indicators.csv (recomputed in report/reporting_lag_check.R)", paste0("Indicator ", code, " for ", Y, ", current bulk copy"))
+    wp_num(paste0("lag_", k, "_", Y, "_lower_bound"), round(r[[paste0(k, "_lb")]], 1), "%", Y, "report/reporting_lag_check.R", paste0("Indicator ", code, " for ", Y, " without links or confirmations resting only on transactions dated after ", Y))
+  }
+  wp_num(paste0("lag_links_", Y), r$links_Y, "links", Y, "activity_edges.parquet; link_transactions.parquet", paste0("Network links with a transaction dated ", Y))
+  wp_num(paste0("lag_links_confirmed_", Y), r$links_Y_confirmed, "links", Y, "activity_edges.parquet", paste0("Of these, confirmed by the receiver"))
+  wp_num(paste0("lag_conf_late_", Y), r$links_Y_conf_late, "links", Y, "link_transactions.parquet", paste0("Of these, all confirming receiver transactions dated after ", Y))
+  wp_num(paste0("lag_conf_late_pct_", Y), round(r$conf_late_pct, 1), "%", Y, "link_transactions.parquet", paste0("Share of confirmed ", Y, " links whose confirmation is dated after ", Y))
+}
+.captions[["reporting_lag"]] <- paste0("Reporting lag check, for the annex (no figure; docs/reporting_lag_check.md). Indicators 1 (Section 4.2), 5 (Section 5.3) and 7b (Section 3.2) of Table 4 for 2023 and 2024, ",
+  "now and without the links and confirmations that rest only on transactions dated after the year: a lower bound of how much a year changes after it ends. Unit: activities (1), transactions (5), organisations (7b).")
+.notes[["reporting_lag"]] <- paste0("Annex only (the author's decision, 17 November 2026): report this check in the annex, for example under A.11 Limitations, and remove the Section 3.2 placeholder (CC-10), keeping there only the one-sentence caution that the latest year may be revised. ",
+  "No earlier bulk copy is available, so the direct test was not possible. The lower bound is small: for 2024, indicator 1 would be ",
+  pct_lab(lag$ind1_lb[lag$year == 2024]), " instead of ", pct_lab(lag$ind1_base[lag$year == 2024]), ", 7b ", pct_lab(lag$ind7b_lb[lag$year == 2024]), " instead of ", pct_lab(lag$ind7b_base[lag$year == 2024]),
+  ", and 5 ", pct_lab(lag$ind5_lb[lag$year == 2024]), " instead of ", pct_lab(lag$ind5_base[lag$year == 2024]), ". This cannot explain the 2025 value of 7b (", pct_lab(g("7b", "all_2025")$percent),
+  "); keep the caution that the latest year may be revised and call 2025 values provisional. A direct test needs an earlier bulk copy (about 13 GB to download).")
+```
+
+```{r wp-fig09, include = FALSE}
+dac <- read_csv("reference/dac_oda_recipients_2025.csv", na = "", show_col_types = FALSE)
+names_ne <- st_drop_geometry(world_ne) |> filter(!is.na(iso2), iso2 != "-99") |> distinct(iso2, .keep_all = TRUE) |> select(iso2, cname = name_long)
+oda_base <- \(d, code) filter(d, indicator == code, !small_base, country %in% dac$iso2)
+# Classes: sextiles of the ODA recipients with a base of 30 or more (all years), rounded to two significant digits
+breaks9 <- map(c(`1` = 1, `3` = 3), \(code) { q <- quantile(oda_base(cg, code)$percent, seq(1, 5) / 6, names = FALSE); unique(signif(q, 2)) })
+cls_labels <- \(b) { lo <- c(0, b); hi <- c(b, NA) # one decimal on every percentage (Fix 16)
+  ifelse(is.na(hi), paste0(pct_lab(lo), " or more"), paste0(pct_lab(lo), " to <", pct_lab(hi))) }
+grey9 <- c("Not an ODA recipient" = "#e6dccb", "Base below 30" = "grey70", "No activities placed" = "grey90")
+map9 <- function(d, code, tag) {
+  b <- breaks9[[as.character(code)]]; lab <- cls_labels(b)
+  m <- world_ne |> filter(continent != "Antarctica") |> left_join(filter(d, indicator == code), by = c(iso2 = "country")) |>
+    mutate(cls = case_when(!(iso2 %in% dac$iso2) ~ "Not an ODA recipient", is.na(denominator) ~ "No activities placed", small_base ~ "Base below 30",
+                           TRUE ~ lab[findInterval(percent, b) + 1]),
+           cls = factor(cls, c(lab, names(grey9))))
+  ggplot(m) + geom_sf(aes(fill = cls), colour = "white", linewidth = 0.08) +
+    scale_fill_manual(values = c(setNames(viridisLite::viridis(length(lab), direction = -1), lab), grey9), drop = TRUE, name = NULL) + # only classes present
+    coord_sf(crs = ee, datum = NA) + labs(tag = tag) +
+    theme_void(base_size = 8) + theme(legend.position = "bottom", plot.tag = element_text(size = 8, face = "bold", hjust = 0), plot.tag.position = c(0.01, 0.98),
+                                      plot.margin = margin(14, 4, 6, 4)) +
+    guides(fill = guide_legend(nrow = 2, keywidth = unit(0.9, "cm"), keyheight = unit(0.25, "cm")))
+}
+p9 <- map9(cg, 1, "A. Indicator 1: activities connected to another organisation's activity") / map9(cg, 3, "B. Indicator 3: outgoing transactions with a valid receiver identifier")
+p9b <- map9(c25, 1, "A. Indicator 1, 2025") / map9(c25, 3, "B. Indicator 3, 2025")
+n_oda <- \(d, code) nrow(oda_base(d, code))
+cap9 <- \(scope_txt, d, extra = "") paste0(
+  "Traceability by recipient country, ", scope_txt, ": indicators 1 and 3 of Table 4 computed for each recipient country (place level, Section 7.2). ",
+  "A: activities connected to an activity of another organisation (indicator 1; unit: activities). B: outgoing commitments and disbursements with a valid receiver identifier (indicator 3; unit: transactions). ",
+  "An activity or transaction that names several countries counts in each (rule 'every', Annex A.8). ",
+  "Classes: the boundaries are the sextiles of the ODA recipients with a base of 30 or more across all years (", n_oda(cg, 1), " countries for indicator 1, ", n_oda(cg, 3),
+  " for indicator 3), rounded to two significant digits, so each colour holds about one sixth of those countries; ", extra,
+  "Countries that are not on the DAC List of ODA Recipients (reporting on 2025 flows, OECD) are drawn in a neutral fill and left out of the classes, so donor countries do not shape the scale. ",
+  "Grey (where present): base below 30, or nothing placed in the country. Tokelau has no shape in the Natural Earth borders and is not drawn. Equal Earth projection.")
+save_fig(p9, "fig09_country_maps", width = 6.5, height = 7.4, caption = paste0("Figure 9. ", cap9("all years", cg)))
+save_fig(p9b, "fig09b_country_maps_2025", width = 6.5, height = 7.4, caption = paste0("Figure 9b. ", cap9("transactions dated 2025", c25, "the 2025 maps use the same boundaries as Figure 9, so colours can be compared; ")),
+  note = "Section 7.2: replace the placeholder on the bands ('Yemi asked how the bands were set') with the class rule in the caption; and use country_indicators_ranked.csv for the sentences on the highest and lowest countries.")
+for (code in names(breaks9)) for (j in seq_along(breaks9[[code]]))
+  wp_num(paste0("fig9_break_ind", code, "_", j), breaks9[[code]][j], "%", "all years", "country_indicators.csv; report/reference/dac_oda_recipients_2025.csv", paste0("Figure 9 class boundary ", j, " for indicator ", code, " (sextiles of ODA recipients, base 30+, two significant digits)"))
+for (code in c("1", "3")) wp_num(paste0("fig9_oda_countries_ind", code), n_oda(cg, as.integer(code)), "countries", "all years", "country_indicators.csv; report/reference/dac_oda_recipients_2025.csv", paste0("ODA recipients with a base of 30 or more, indicator ", code))
+```
+
+```{r wp-country-ranked, include = FALSE}
+# 20 highest and 20 lowest ODA recipients (base of 30 or more), indicators 1 and 3, all years. Ties at the bottom: larger base first.
+rank9 <- map_dfr(c(1, 3), \(code) {
+  d <- oda_base(cg, code) |> left_join(names_ne, by = c(country = "iso2")) |> left_join(select(dac, iso2, dac_name = name), by = c(country = "iso2")) |>
+    mutate(country_name = coalesce(dac_name, cname))
+  bind_rows(d |> arrange(desc(percent), desc(denominator)) |> head(20) |> mutate(end = "highest", rank = row_number()),
+            d |> arrange(percent, desc(denominator)) |> head(20) |> mutate(end = "lowest", rank = row_number())) |>
+    transmute(indicator = code, unit = if (code == 1) "activities" else "transactions", end, rank, country, country_name, numerator, denominator, percent)
+})
+write_csv(rank9, file.path(wp_dir, "country_indicators_ranked.csv"), na = "")
+md9 <- c("# Countries with the highest and lowest values of indicators 1 and 3", "",
+         "ODA recipients (DAC list, 2025 flows) with a base of 30 or more; all years; rule 'every'. Ties at the bottom are ordered by the larger base. Written by report/working_paper.qmd.", "")
+for (code in c(1, 3)) for (e in c("highest", "lowest")) {
+  d <- filter(rank9, indicator == code, end == e)
+  md9 <- c(md9, paste0("## Indicator ", code, ", ", e, " 20 (unit: ", d$unit[1], ")"), "", "| Rank | Country | Numerator | Denominator | Rate |", "|---:|---|---:|---:|---:|",
+           paste0("| ", d$rank, " | ", d$country_name, " (", d$country, ") | ", fmt(d$numerator), " | ", fmt(d$denominator), " | ", pct_lab(d$percent), " |"), "")
+}
+writeLines(md9, file.path(wp_dir, "country_indicators_ranked.md"))
+.captions[["country_indicators_ranked"]] <- paste0("Table (new). The 20 ODA recipients with the highest and the 20 with the lowest values of indicator 1 (unit: activities) and indicator 3 (unit: transactions) of Table 4 (Section 7.2), ",
+  "with numerator, denominator and rate; base of 30 or more; all years. Figure-ready version: country_indicators_ranked.md.")
+for (i in seq_len(nrow(rank9))) { r <- rank9[i, ]
+  k <- paste0("rank9_ind", r$indicator, "_", r$end, r$rank)
+  wp_num(k, r$percent, "%", r$country, "country_indicators.csv", paste0("Indicator ", r$indicator, ", ", r$end, " rank ", r$rank, ": ", r$country_name))
+  wp_num(paste0(k, "_num"), r$numerator, r$unit, r$country, "country_indicators.csv", paste0("Numerator, ", r$country_name))
+  wp_num(paste0(k, "_den"), r$denominator, r$unit, r$country, "country_indicators.csv", paste0("Denominator, ", r$country_name)) }
+```
+
+```{r wp-flows-wp-setup, include = FALSE}
+invisible(run_chunk("flows-options-setup")) # flow_x, flow_pos, flow_name, flow_region
+key5 <- c(GB = "United Kingdom", NL = "Netherlands", US = "United States", SE = "Sweden", DK = "Denmark")
+fgrp <- \(cc) factor(coalesce(key5[cc], "Other national funders"), names(funder_col))
+fx <- flow_x |> mutate(funder = fgrp(from_country))
+n_links_x <- sum(fx$links); n_pairs_x <- nrow(distinct(fx, from_country, to_place))
+cap_common <- paste0("National funders only (funding organisations registered in a country; international bodies are counted but not drawn), receiving activities in one recipient country, all years. ",
+  "Links, not money: each link is one activity link between a funder's activity and a receiving activity (Table 4, place level; Section 7.3). ")
+by_funder <- fx |> group_by(funder) |> summarise(links = sum(links), countries = n_distinct(to_place), .groups = "drop")
+top5_share <- fx |> group_by(funder, to_place) |> summarise(n = sum(links), .groups = "drop") |> group_by(funder) |>
+  summarise(top5 = sum(sort(n, decreasing = TRUE)[1:min(5, n())]), total = sum(n), .groups = "drop") |> mutate(share = 100 * top5 / total)
+```
+
+```{r wp-fig10, include = FALSE}
+d_x <- fx |> filter(links >= flow_thr) |>
+  left_join(select(flow_pos, iso2, x1 = lon, y1 = lat, px1 = px, py1 = py), by = c(from_country = "iso2")) |>
+  left_join(select(flow_pos, iso2, x2 = lon, y2 = lat, px2 = px, py2 = py), by = c(to_place = "iso2")) |> filter(!is.na(x1), !is.na(x2)) |> arrange(links)
+gc_route <- function(x1, y1, x2, y2, n = 150) { # great circle in lon/lat
+  r <- pi / 180; f <- seq(0, 1, length.out = n)
+  a <- c(cos(y1 * r) * cos(x1 * r), cos(y1 * r) * sin(x1 * r), sin(y1 * r)); b <- c(cos(y2 * r) * cos(x2 * r), cos(y2 * r) * sin(x2 * r), sin(y2 * r))
+  d <- acos(pmin(1, sum(a * b))); p <- t(sapply(f, \(k) (sin((1 - k) * d) * a + sin(k * d) * b) / sin(d)))
+  cbind(atan2(p[, 2], p[, 1]) / r, asin(p[, 3]) / r)
+}
+# A great circle that crosses the date line (the map edge) is replaced by the straight on-map line between the two countries
+d_geo <- lapply(seq_len(nrow(d_x)), \(i) { co <- gc_route(d_x$x1[i], d_x$y1[i], d_x$x2[i], d_x$y2[i])
+  if (any(abs(diff(co[, 1])) > 180)) st_linestring(rbind(c(d_x$px1[i], d_x$py1[i]), c(d_x$px2[i], d_x$py2[i]))) else
+    st_transform(st_sfc(st_linestring(co), crs = 4326), ee)[[1]] })
+d_x$crosses <- vapply(seq_len(nrow(d_x)), \(i) any(abs(diff(gc_route(d_x$x1[i], d_x$y1[i], d_x$x2[i], d_x$y2[i])[, 1])) > 180), logical(1))
+d_sf <- st_sf(select(d_x, links, funder), geometry = st_sfc(d_geo, crs = ee))
+send10 <- d_x |> distinct(from_country) |> left_join(flow_pos, by = c(from_country = "iso2"))
+recv10 <- fx |> count(to_place, wt = links, name = "n") |> slice_max(n, n = 10, with_ties = FALSE) |> left_join(flow_pos, by = c(to_place = "iso2"))
+lab10 <- bind_rows(send10 |> transmute(iso2 = from_country, px, py, cname, face = "bold"),
+                   recv10 |> filter(!to_place %in% send10$from_country) |> transmute(iso2 = to_place, px, py, cname, face = "plain"))
+p10 <- ggplot() +
+  geom_sf(data = st_transform(world_ne, ee), fill = flow_land, colour = "white", linewidth = 0.1) +
+  geom_sf(data = d_sf, aes(linewidth = links, colour = funder), alpha = 0.55, lineend = "round") +
+  geom_point(data = send10, aes(px, py), shape = 17, size = 1.6, colour = flow_ink) +
+  # funder (bold) and recipient labels in one layer, so they keep clear of each other; a country that is both is labelled once, in bold
+  geom_text_repel(data = lab10, aes(px, py, label = cname, fontface = face), size = 2.3, colour = flow_ink, seed = 2, min.segment.length = 0, segment.size = 0.2,
+                  box.padding = 0.35, force = 2, max.overlaps = Inf) +
+  scale_linewidth_continuous(range = c(0.12, 2.2), breaks = c(10, 50, 150, 300), name = "Links") +
+  scale_colour_manual(values = funder_col, name = "Funder registered in", drop = FALSE) +
+  coord_sf(crs = ee, datum = NA, ylim = c(-4.6e6, 8.2e6)) + theme_void(base_size = 8) + theme(legend.position = "bottom", legend.box = "vertical", legend.spacing.y = unit(0, "mm")) +
+  guides(colour = guide_legend(override.aes = list(linewidth = 1.5, alpha = 1), nrow = 2))
+save_fig(p10, "fig10_flow_routes", width = 6.5, height = 4, caption = paste0(
+  "Figure 10. Cross-border network links from national funders, by the funder's country of registration and the recipient country. ", cap_common,
+  "Drawn: every country pair with ", flow_thr, " or more links (", nrow(d_x), " pairs, ", fmt(sum(d_x$links)), " of the ", fmt(n_links_x), " cross-border links in ", n_pairs_x, " pairs). ",
+  "Lines follow the shortest path between the two countries; the ", sum(d_x$crosses), " routes whose shortest path crosses the date line at the map edge are drawn as straight lines across the map. ",
+  "Line width: links; colour: funder country (the same in Figures 11 and 12). Triangles and bold labels: funder countries; plain labels: the 10 recipient countries with most links (a country that is both, such as Kenya, is labelled in bold). Equal Earth projection. Unit: links."))
+```
+
+```{r wp-fig11, include = FALSE}
+a_d <- fx |> group_by(funder, to_place) |> summarise(links = sum(links), .groups = "drop") |> left_join(flow_pos, by = c(to_place = "iso2")) |> filter(!is.na(px))
+hd11 <- by_funder |> left_join(top5_share, by = "funder") |>
+  mutate(lab = paste0(funder, ": ", fmt(links), " links to ", countries, " countries\nfive largest recipients: ", pct_lab(share), " of its links"), lab = factor(lab, lab))
+a_d <- left_join(a_d, select(hd11, funder, lab), by = "funder")
+tri11 <- tibble(funder = factor(key5, names(funder_col)), iso2 = names(key5)) |> left_join(flow_pos, by = "iso2") |> left_join(select(hd11, funder, lab), by = "funder")
+p11 <- ggplot() +
+  geom_sf(data = st_transform(world_ne, ee), fill = flow_land, colour = "white", linewidth = 0.08) +
+  geom_point(data = arrange(a_d, desc(links)), aes(px, py, size = links, fill = funder), shape = 21, colour = "white", stroke = 0.25, alpha = 0.9) +
+  geom_point(data = tri11, aes(px, py), shape = 17, size = 1.5, colour = flow_ink) +
+  geom_text_repel(data = group_by(a_d, lab) |> slice_max(links, n = 5, with_ties = FALSE), aes(px, py, label = cname), size = 1.9, colour = flow_ink, seed = 3,
+                  min.segment.length = 0, segment.size = 0.2, box.padding = 0.35, force = 2, max.overlaps = Inf) +
+  scale_size_area(max_size = 8, breaks = c(10, 50, 150, 300), name = "Links to the recipient country", guide = guide_legend(override.aes = list(fill = "grey55"))) +
+  scale_fill_manual(values = funder_col, guide = "none") +
+  facet_wrap(~lab, ncol = 2) + coord_sf(crs = ee, datum = NA, ylim = c(-4.3e6, 7.7e6)) +
+  theme_void(base_size = 7.5) + theme(legend.position = "bottom", strip.text = element_text(face = "bold", hjust = 0, size = 7, margin = margin(b = 2, t = 4), lineheight = 1))
+save_fig(p11, "fig11_flow_small_maps", width = 6.5, height = 5.6, caption = paste0(
+  "Figure 11. Cross-border network links by funder country. ", cap_common, "All ", fmt(n_links_x), " cross-border links in ", n_pairs_x, " country pairs. ",
+  "One map per funder country (the five with most links; other national funders together); circle area shows the number of links to each recipient country, on the same scale in every panel. ",
+  "Triangle: funder country. Labels: the five recipient countries with most links in each panel. Under each title: links, recipient countries, and the share of the funder's links that go to its five largest recipient countries. Colours as in Figures 10 and 12. Equal Earth projection. Unit: links."))
+```
+
+```{r wp-fig11b, include = FALSE}
+cfy <- rd("country_flows_by_year.csv") |> filter(to_is_country, !domestic, from_country != "unknown", !from_international) |> mutate(funder = fgrp(from_country))
+fy <- bind_rows(cfy |> group_by(funder, period = as.character(year)) |> summarise(links = sum(links), countries = n_distinct(to_place), .groups = "drop"),
+                by_funder |> mutate(period = "All years")) |>
+  mutate(period = factor(period, c("2023", "2024", "2025", "All years")), funder = factor(funder, rev(names(funder_col))))
+p11b <- ggplot(fy, aes(period, funder)) +
+  geom_tile(aes(fill = funder, alpha = links), colour = "white", linewidth = 0.8) +
+  geom_text(aes(label = paste0(fmt(links), "\n", countries, " countries")), size = 2.3, lineheight = 0.9) +
+  scale_fill_manual(values = funder_col, guide = "none") + scale_alpha_continuous(range = c(0.15, 0.75), guide = "none", trans = "sqrt") +
+  scale_x_discrete(position = "top") + labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 8) + theme(panel.grid = element_blank(), axis.text = element_text(colour = "grey15"))
+save_fig(p11b, "fig11b_flows_by_year", width = 5, height = 3.2, caption = paste0(
+  "Figure 11b. Cross-border network links by funder country and year: links (and recipient countries) with at least one transaction dated in the year; all years for comparison. ", cap_common,
+  "A link can count in several years, so the years do not add up to all years. Colour as in Figures 10 to 12; shade rises with the number of links. Unit: links."))
+```
+
+```{r wp-fig12, include = FALSE}
+b_x <- fx |> mutate(region = recode(flow_region(to_place), "East Asia & Pacific" = "East Asia and Pacific", "Middle East & North Africa" = "Middle East and North Africa",
+                                    "Latin America & Caribbean" = "Latin America and Caribbean", "Europe & Central Asia" = "Europe and Central Asia", "North America" = "Other"))
+b_top <- b_x |> count(to_place, region, wt = links, name = "n") |> group_by(region) |>
+  mutate(r = row_number(desc(n))) |> filter(r <= if_else(region == "Sub-Saharan Africa", 14L, 3L), region != "Other") |> pull(to_place)
+b_reg <- b_x |> count(region, wt = links, name = "n") |> arrange(desc(n)) |> pull(region)
+b_x <- b_x |> mutate(dest = if_else(to_place %in% b_top, flow_name(to_place), if_else(region == "Other", "Other", paste0("Other countries|", region))), src = as.character(funder))
+b_fl <- b_x |> group_by(src, dest, region) |> summarise(n = sum(links), .groups = "drop")
+b_gap <- 55
+b_src <- b_fl |> count(src, wt = n, name = "t") |> mutate(o = match(src, names(funder_col))) |> arrange(o) |> mutate(y1 = cumsum(lag(t + b_gap, default = 0)))
+b_dst <- b_fl |> group_by(region, dest) |> summarise(t = sum(n), .groups = "drop") |>
+  mutate(region = factor(region, b_reg)) |> arrange(region, startsWith(dest, "Other"), desc(t)) |>
+  mutate(rg = as.integer(region), y1 = cumsum(lag(t + b_gap / 2, default = 0)) + (rg - 1) * b_gap * 3, y2 = y1 + t)
+b_src <- b_src |> mutate(y1 = y1 * max(b_dst$y2) / max(y1 + t), y2 = y1 + t)
+b_fl <- b_fl |> mutate(s = match(src, b_src$src), d = match(dest, b_dst$dest)) |>
+  arrange(s, d) |> group_by(src) |> mutate(s_off = cumsum(lag(n, default = 0))) |> ungroup() |>
+  arrange(d, s) |> group_by(dest) |> mutate(d_off = cumsum(lag(n, default = 0))) |> ungroup() |>
+  mutate(sy = b_src$y1[s] + s_off, dy = b_dst$y1[d] + d_off, id = row_number())
+b_t <- seq(0, 1, length.out = 40); b_ease <- 3 * b_t^2 - 2 * b_t^3
+b_rib <- b_fl |> rowwise() |> reframe(id = id, src = src, x = c(b_t, rev(b_t)), y = c(sy + (dy - sy) * b_ease, rev(sy + n + (dy - sy) * b_ease)))
+b_regs <- b_dst |> group_by(region) |> summarise(y1 = min(y1), y2 = max(y2), t = sum(t)) |>
+  mutate(l = paste0(region, "\n", fmt(t), " (", pct_lab(100 * t / n_links_x), ")"))
+p12 <- ggplot() +
+  geom_polygon(data = b_rib, aes(x, y, group = id, fill = src), alpha = 0.62, colour = NA) +
+  geom_rect(data = b_src, aes(xmin = -0.012, xmax = 0, ymin = y1, ymax = y2, fill = src)) +
+  geom_rect(data = b_dst, aes(xmin = 1, xmax = 1.012, ymin = y1, ymax = y2), fill = "grey30") +
+  geom_text(data = b_src, aes(-0.02, (y1 + y2) / 2, label = paste0(src, "  ", fmt(t))), hjust = 1, size = 2.5, colour = flow_ink) +
+  geom_text_repel(data = b_dst, aes(1.02, (y1 + y2) / 2, label = paste0(str_remove(dest, "\\|.*$"), "  ", fmt(t))), hjust = 0, size = 2.1, colour = flow_ink,
+                  direction = "y", xlim = c(1.02, 1.4), min.segment.length = 0, segment.size = 0.15, segment.colour = "grey60",
+                  box.padding = 0.05, point.padding = 0, force = 0.6, force_pull = 2, max.overlaps = Inf, seed = 1) +
+  geom_segment(data = b_regs, aes(x = 1.45, xend = 1.45, y = y1, yend = y2), colour = "grey40", linewidth = 0.4) +
+  geom_text(data = b_regs, aes(1.465, (y1 + y2) / 2, label = str_wrap(l, 20)), hjust = 0, size = 2.3, fontface = "bold", colour = flow_ink, lineheight = 0.9) +
+  scale_fill_manual(values = funder_col, guide = "none") +
+  scale_y_reverse() + scale_x_continuous(limits = c(-0.6, 1.9), expand = c(0, 0)) + theme_void(base_size = 8)
+save_fig(p12, "fig12_flow_sankey", width = 6.5, height = 7.6, caption = paste0(
+  "Figure 12. All cross-border network links from national funders, from the funder's country of registration (left) to the recipient country (middle) and region (right). ", cap_common,
+  fmt(n_links_x), " links in ", n_pairs_x, " country pairs. Ribbon width shows the number of links; numbers are links; region labels give the region's links and its share of all cross-border links. ",
+  "Recipient countries: the 14 with most links in Sub-Saharan Africa and the 3 with most links in each other region; the rest are grouped by region ('Other countries'). Regions: World Bank regions (Natural Earth). Colours as in Figures 10 and 11. Unit: links."))
+# numbers
+for (i in seq_len(nrow(by_funder))) { r <- by_funder[i, ]; f <- as.character(r$funder)
+  wp_num(paste0("flows_funder_", f, "_links"), r$links, "links", "all years", "country_flows.csv", paste0("Cross-border links from funders registered in: ", f))
+  wp_num(paste0("flows_funder_", f, "_countries"), r$countries, "countries", "all years", "country_flows.csv", paste0("Recipient countries of those links: ", f))
+  wp_num(paste0("flows_funder_", f, "_top5_pct"), round(top5_share$share[top5_share$funder == r$funder], 1), "%", "all years", "country_flows.csv", paste0("Share of the funder's links going to its five largest recipient countries: ", f)) }
+for (i in seq_len(nrow(b_regs))) wp_num(paste0("flows_region_", b_regs$region[i], "_links"), b_regs$t[i], "links", "all years", "country_flows.csv; Natural Earth region_wb", paste0("Cross-border links to ", b_regs$region[i]))
+for (i in seq_len(nrow(b_regs))) wp_num(paste0("flows_region_", b_regs$region[i], "_pct"), round(100 * b_regs$t[i] / n_links_x, 1), "%", "all years", "country_flows.csv", paste0("Share of all cross-border links: ", b_regs$region[i]))
+for (i in seq_len(nrow(recv10))) wp_num(paste0("flows_top_recipient_", i), recv10$n[i], "links", recv10$to_place[i], "country_flows.csv", paste0("Cross-border links to ", recv10$cname[i], " (rank ", i, ")"))
+for (i in which(fy$period != "All years")) { r <- fy[i, ]
+  wp_num(paste0("flows_year_", r$funder, "_", r$period, "_links"), r$links, "links", as.character(r$period), "country_flows_by_year.csv", paste0("Cross-border links with a transaction dated in the year: ", r$funder))
+  wp_num(paste0("flows_year_", r$funder, "_", r$period, "_countries"), r$countries, "countries", as.character(r$period), "country_flows_by_year.csv", paste0("Recipient countries of those links: ", r$funder)) }
+wp_num("flows_routes_pairs_drawn", nrow(d_x), "country pairs", "all years", "country_flows.csv", paste0("Figure 10: country pairs with ", flow_thr, " or more links"))
+wp_num("flows_routes_links_drawn", sum(d_x$links), "links", "all years", "country_flows.csv", "Figure 10: links in the pairs drawn")
+```
+
+```{r wp-loc-precision, include = FALSE}
+lp <- read_csv(file.path(wp_dir, "location_precision.csv"), show_col_types = FALSE)
+grp_lp <- c("All usable points", "Network activities", "End activities of chains of 2+ steps")
+m_lp <- c(within_10km = "Within 10 km of a national capital", within_25km = "Within 25 km of a national capital",
+          pplc_or_ppla = "GeoNames code PPLC or PPLA\n(of points with a code)", exact = "Marked exact (exactness 1)")
+d_lp <- lp |> filter(group %in% grp_lp, measure %in% names(m_lp)) |>
+  mutate(group = factor(group, rev(grp_lp)), measure = factor(m_lp[measure], m_lp))
+p_lp <- ggplot(d_lp, aes(percent, group, fill = group)) +
+  geom_col(width = 0.7) +
+  geom_text(aes(label = paste0(pct_lab(percent), " (", fmt(numerator), " of ", fmt(denominator), ")")), hjust = -0.05, size = 2.2) +
+  facet_wrap(~measure, ncol = 1) +
+  scale_fill_manual(values = setNames(c("#9ecae1", "#4a90d9", "#1d4f91"), rev(grp_lp)), guide = "none") +
+  scale_x_continuous(limits = c(0, 115), breaks = c(0, 25, 50, 75, 100), labels = \(x) paste0(x, "%"), expand = c(0, 0)) +
+  labs(x = "Share of usable points", y = NULL) +
+  theme_minimal(base_size = 8) + theme(panel.grid.minor = element_blank(), panel.grid.major.y = element_blank(), strip.text = element_text(face = "bold", hjust = 0))
+v_lp <- \(g, m, k = "percent") lp[[k]][lp$group == g & lp$measure == m]
+save_fig(p_lp, "fig_new_location_precision", width = 6.5, height = 4.6, caption = paste0(
+  "Are published locations at capital cities? Usable points (Section 7.4: a valid coordinate inside a recipient country and not coded as the whole country; not one of the Table 4 indicators). ",
+  "Distance: to the nearest national capital of the activity's recipient countries (Natural Earth 1:50m populated places; countries with several capitals keep all; ", fmt(lp$points_without_capital[1]),
+  " points in countries without a listed capital are left out of the distance measures). GeoNames codes: PPLC, capital of a political entity; PPLA, seat of a first-order administrative division, ",
+  "among the points that publish a code (", pct_lab(v_lp("All usable points", "feature_code_given")), " of usable points). Exactness: 1 exact, 2 approximate. ",
+  "Network activities: activities in the activity network; chain ends: end activities of chains of 2 or more steps. Labels: share (points meeting the condition of the base). All years. Unit: location points. ",
+  "By publisher type: figures/wp/location_precision.csv."),
+  note = paste0("Section 7.4 placeholder (the ODS finding that most geolocated IATI data are placed at capital cities): from the pipeline, ", pct_lab(v_lp("All usable points", "within_10km")),
+    " of usable points lie within 10 km of a national capital and ", pct_lab(v_lp("All usable points", "within_25km")), " within 25 km; ", pct_lab(v_lp("All usable points", "pplc")),
+    " of the points that publish a GeoNames code are coded as a capital (PPLC). So a quarter, not most, of usable points are at capitals; the share is lower for network activities (",
+    pct_lab(v_lp("Network activities", "within_10km")), " within 10 km). Compare with the ODS notebook when it arrives (the definition of 'geolocated' may differ)."))
+for (i in seq_len(nrow(lp))) { r <- lp[i, ]
+  k <- paste0("locprec_", r$group, "_", r$measure)
+  wp_num(k, r$percent, "%", "all years", "figures/wp/location_precision.csv (report/location_precision.py)", paste0("Location check, ", r$group, ": ", r$measure))
+  wp_num(paste0(k, "_n"), r$numerator, "location points", "all years", "figures/wp/location_precision.csv (report/location_precision.py)", paste0("Location check, ", r$group, ": ", r$measure, " (numerator)"))
+  wp_num(paste0(k, "_den"), r$denominator, "location points", "all years", "figures/wp/location_precision.csv (report/location_precision.py)", paste0("Location check, ", r$group, ": ", r$measure, " (denominator)")) }
+```
+
+```{r wp-chain-maps, include = FALSE}
+# The text names the Figure 13 chain; stop if it is no longer selected (as in chapter6_draft.qmd)
+fig13_id <- geo_ch |> filter(showcase, str_detect(path_orgs, "Womankind")) |> pull(chain_id)
+stopifnot("Figure 13 chain (Womankind) is no longer selected" = length(fig13_id) == 1)
+fig14_id <- geo_ch |> filter(counterexample) |> pull(chain_id)
+stopifnot(length(fig14_id) == 1)
+reach_lab <- c(`1` = "activity site", `2` = "beneficiary location")
+link_lab2 <- c(confirmed = "Confirmed (both sides report)", `one-sided` = "One side reports", context = "Other organisation links")
+link_col2 <- c(ev_col[c("confirmed", "one-sided")], context = "grey70")
+names(link_col2) <- link_lab2
+role_lab2 <- c(Funder = "Funder (first in the chain)", Intermediary = "Intermediary", Implementer = "Implementer (last in the chain)")
+
+panel_global_wp <- function(id) {
+  st <- geo_steps |> filter(chain_id == id) |> arrange(step)
+  o <- geo_org |> filter(chain_id == id) |> arrange(position) |> distinct(org_ref, .keep_all = TRUE) |> place_orgs() |> to_ee() |>
+    mutate(role = factor(role_lab2[str_to_title(role)], role_lab2),
+           lab = paste0(wrap_name(org_name, 24), "\n(", org_country, "; ", org_type, ")"))
+  pos <- geo_org |> filter(chain_id == id) |> arrange(position)
+  links <- tibble(from = pos$org_ref[-nrow(pos)], to = pos$org_ref[-1], evidence = st$evidence) |>
+    left_join(select(o, org_ref, x1 = px, y1 = py), by = c(from = "org_ref")) |>
+    left_join(select(o, org_ref, x2 = px, y2 = py), by = c(to = "org_ref")) |> mutate(kind = factor(link_lab2[evidence], link_lab2))
+  ctx <- geo_ctx |> filter(chain_id == id) |> left_join(select(o, org_ref, x1 = px, y1 = py), by = c(from_org = "org_ref")) |>
+    left_join(ne_labels, by = c(to_country = "iso2")) |> mutate(lx = lx + runif(n(), -1.5, 1.5), ly = ly + runif(n(), -1.5, 1.5)) |>
+    to_ee("lx", "ly") |> rename(x2 = px, y2 = py) |> mutate(kind = factor(link_lab2[["context"]], link_lab2))
+  end_c <- o$org_country[o$role == role_lab2[["Implementer"]]]
+  box <- world_ne |> filter(iso2 == end_c) |> st_transform(ee) |> st_bbox()
+  # Extent from the chain's own organisations and the end country (context lines may run off the edge)
+  allx <- c(o$px, box[c(1, 3)]); ally <- c(o$py, box[c(2, 4)])
+  padx <- 0.15 * diff(range(allx)) + 9e5; pady <- 0.2 * diff(range(ally)) + 9e5
+  ggplot() +
+    geom_sf(data = st_transform(world_ne, ee), fill = "#e3e2dd", colour = "white", linewidth = 0.15) +
+    geom_curve(data = ctx, aes(x1, y1, xend = x2, yend = y2, colour = kind), linewidth = 0.25, curvature = 0.2) +
+    geom_curve(data = links, aes(x1, y1, xend = x2, yend = y2, colour = kind), linewidth = 0.9, curvature = -0.25, arrow = arrow(length = unit(1.6, "mm"), type = "closed")) +
+    annotate("rect", xmin = box[1], xmax = box[3], ymin = box[2], ymax = box[4], fill = NA, colour = "grey20", linewidth = 0.4) +
+    geom_point(data = o, aes(px, py, fill = role), shape = 21, colour = "white", size = 3, stroke = 0.6) +
+    geom_label_repel(data = o, aes(px, py, label = lab), size = 1.95, lineheight = 0.85, seed = 2, min.segment.length = 0, box.padding = 0.35,
+                     label.size = 0.1, label.padding = unit(0.1, "lines"), fill = alpha("white", 0.85), segment.colour = "grey40", segment.size = 0.25, max.overlaps = Inf) +
+    scale_fill_manual(values = setNames(role_col, role_lab2), name = "Role in the chain", limits = role_lab2, drop = FALSE) +
+    scale_colour_manual(values = link_col2, name = NULL, limits = link_lab2, drop = FALSE) +
+    coord_sf(crs = ee, xlim = range(allx) + c(-padx, padx), ylim = range(ally) + c(-pady, pady), expand = FALSE, datum = NA) +
+    labs(tag = "A") + base_theme + theme(plot.tag = element_text(face = "bold", size = 9))
+}
+
+panel_country_wp <- function(id) {
+  o <- geo_org |> filter(chain_id == id) |> arrange(position)
+  imp <- filter(o, role == "implementer"); prev <- filter(o, position == max(position) - 1)
+  last_ev <- geo_steps |> filter(chain_id == id) |> slice_max(step, n = 1) |> pull(evidence)
+  crs_l <- sprintf("+proj=laea +lat_0=%.3f +lon_0=%.3f", imp$lat, imp$lon)
+  shape <- world_ne |> filter(iso2 == imp$org_country) |> st_transform(crs_l)
+  bb <- st_bbox(shape); w <- max(bb[3] - bb[1], bb[4] - bb[2]); m <- 0.14 * w
+  extra <- max(0, 0.9 * (bb[4] - bb[2]) - (bb[3] - bb[1])) / 2; bb[1] <- bb[1] - extra; bb[3] <- bb[3] + extra
+  node <- st_as_sf(tibble(x = imp$lon, y = imp$lat), coords = c("x", "y"), crs = 4326) |> st_transform(crs_l) |> st_coordinates()
+  pts <- geo_pt |> filter(chain_id == id, is_end, point_usable)
+  ex_lab <- c("Marked exact", "Approximate or not stated")
+  if (nrow(pts)) {
+    xy <- st_as_sf(pts, coords = c("lon", "lat"), crs = 4326) |> st_transform(crs_l) |> st_coordinates()
+    pts <- pts |> mutate(px = xy[, 1], py = xy[, 2],
+                         kind = factor(if_else(coalesce(as.character(exactness), "") %in% c("1", "1.0"), ex_lab[1], ex_lab[2]), ex_lab),
+                         reach = coalesce(reach_lab[str_remove(as.character(location_reach), "\\.0$")], "reach not stated"),
+                         lab = paste0(if_else(is.na(location_name), "(no name published)", str_wrap(clean_name(location_name), 22)), "\n", reach))
+  }
+  entry <- c(bb[1] - m, bb[2] - m) # the incoming link starts at the panel's lower-left corner, so it enters from outside the country
+  p <- ggplot() +
+    geom_sf(data = st_transform(world_ne, crs_l), fill = "#ecebe7", colour = "white", linewidth = 0.3) +
+    geom_sf(data = shape, fill = "#d9d7d1", colour = "grey55", linewidth = 0.3) +
+    annotate("curve", x = entry[1], y = entry[2], xend = node[1], yend = node[2], curvature = -0.2, colour = ev_col[[last_ev]], linewidth = 1,
+             arrow = arrow(length = unit(2, "mm"), type = "closed")) +
+    annotate("label", x = entry[1] + 0.03 * w, y = entry[2] + 0.03 * w, hjust = 0, vjust = 0, size = 2.1, lineheight = 0.85,
+             label.size = 0, fill = alpha("white", 0.8), label = paste0("from ", wrap_name(prev$org_name, 30), " (", prev$org_country, ")"))
+  if (nrow(pts)) {
+    p <- p + geom_curve(data = pts, aes(x = node[1], y = node[2], xend = px, yend = py), curvature = 0.15, colour = "black", linewidth = 0.3,
+                        arrow = arrow(length = unit(1.3, "mm"), type = "closed")) +
+      geom_point(data = pts, aes(px, py, shape = kind), colour = role_col[["Implementer"]], fill = role_col[["Implementer"]], size = 2.4, stroke = 0.9) +
+      # the implementer and the locations in one label layer, so the labels keep clear of each other
+      geom_text_repel(data = bind_rows(transmute(pts, px, py, lab, face = "plain"),
+                                       tibble(px = node[1], py = node[2], lab = paste0(wrap_name(imp$org_name, 26), "\n(registered in ", imp$country_name, ")"), face = "bold")),
+                      aes(px, py, label = lab, fontface = face), size = 1.9, lineheight = 0.85, seed = 3, colour = "grey15", min.segment.length = 0,
+                      segment.size = 0.2, box.padding = 0.45, force = 2, max.overlaps = Inf, bg.colour = "white", bg.r = 0.1)
+  } else {
+    cx <- node[1] + 0.2 * w; cy <- node[2] + 0.17 * w
+    p <- p + annotate("segment", x = node[1], y = node[2], xend = cx, yend = cy, colour = "#c0392b", linetype = "22", linewidth = 0.8) +
+      annotate("point", x = cx, y = cy, shape = 21, size = 9, colour = "#c0392b", fill = "#f4f3ef", stroke = 0.8) +
+      annotate("text", x = cx, y = cy + 0.06 * w, colour = "#c0392b", size = 2.3, vjust = 0, label = "country only:\nno location published")
+  }
+  if (!nrow(pts)) p <- p + annotate("label", x = node[1], y = node[2] - 0.035 * w, vjust = 1, size = 2.1, label.size = 0, fill = alpha("white", 0.8), lineheight = 0.85,
+                                    label = paste0(wrap_name(imp$org_name, 26), "\n(registered in ", imp$country_name, ")"))
+  p + annotate("point", x = node[1], y = node[2], shape = 23, size = 3.4, fill = role_col[["Implementer"]], colour = "white", stroke = 0.7) + # diamond: not a location point
+    geom_point(data = tibble(kind = factor(ex_lab, ex_lab), x = bb[1] - 10 * w, y = bb[2] - 10 * w), aes(x, y, shape = kind),
+               colour = role_col[["Implementer"]], fill = role_col[["Implementer"]], size = 2.4, stroke = 0.9) +
+    scale_shape_manual(values = setNames(c(21, 1), ex_lab), name = "Published location", drop = FALSE) +
+    coord_sf(crs = crs_l, xlim = c(bb[1] - m, bb[3] + m), ylim = c(bb[2] - m, bb[4] + m), expand = FALSE, datum = NA) +
+    labs(tag = "B") + base_theme + theme(plot.tag = element_text(face = "bold", size = 9))
+}
+
+# Side by side; panel A above panel B when the chain spans a wide, shallow area (e.g. UK, US and Nepal)
+chain_map <- function(id) {
+  set.seed(1)
+  pa <- panel_global_wp(id); pb <- panel_country_wp(id)
+  lim <- pa$coordinates$limits; ratio <- diff(lim$x) / diff(lim$y)
+  lay <- if (ratio > 2.2) (pa / pb) + plot_layout(heights = c(1, 1.5), guides = "collect") else (pa | pb) + plot_layout(widths = c(1.4, 1), guides = "collect")
+  lay & theme(legend.position = "bottom", legend.box = "vertical", legend.text = element_text(size = 7), legend.title = element_text(size = 7.5),
+              legend.spacing.y = unit(0.5, "mm"), legend.key = element_blank())
+}
+map_height <- function(id) { lim <- panel_global_wp(id)$coordinates$limits; if (diff(lim$x) / diff(lim$y) > 2.2) 7 else 4.6 }
+map_caption <- function(id, fig) {
+  ch <- filter(geo_ch, chain_id == id); st <- filter(geo_steps, chain_id == id)
+  pts <- filter(geo_pt, chain_id == id, is_end, point_usable)
+  paste0(fig, " A chain from ", clean_name(str_split_1(ch$path_orgs, " > ")[1]), " to ", clean_name(ch$end_org), ", ", ch$steps, " steps (", sum(st$evidence == "confirmed"),
+    " confirmed by both sides), years ", ch$first_year, " to ", ch$last_year, ". Relates to the place level of Table 4 (Section 7.4) and the chain level (Section 6). ",
+    "A: organisations placed by country of registration, each labelled with its full name, country of registration and IATI organisation type; colour shows the organisation's role, ",
+    "taken from its position in the chain (first: funder; last: implementer; between: intermediary), not from an IATI field. Arrows: the chain's activity links, coloured by evidence as in the chain diagrams ",
+    "(blue: confirmed by both sides; green: reported by one side); grey: other organisation links of the same organisations (up to ", ctx_n, " each). Box: the end country. ",
+    "B: the end country (equal-area projection centred on it); the implementer (diamond) is drawn at the country's label point, not at a published location, with arrows to the usable points its end activity publishes (",
+    nrow(pts), "), each labelled with its published name and location reach (activity site, or where beneficiaries live); filled if marked exact, hollow if approximate or not stated. ",
+    if (!nrow(pts)) paste0("This end activity publishes no usable location (", ch$end_problem, "); the dashed line marks the missing location. ") else "",
+    "Equal Earth projection (A). Unit: organisations; activity links; location points.")
+}
+fig13 <- chain_map(fig13_id); fig14 <- chain_map(fig14_id)
+save_fig(fig13, "fig13_chain_ethiopia", width = 6.5, height = map_height(fig13_id), caption = map_caption(fig13_id, "Figure 13."))
+save_fig(fig14, "fig14_chain_nepal", width = 6.5, height = map_height(fig14_id), caption = paste(map_caption(fig14_id, "Figure 14."), "Panel A is cropped to the chain's organisations (United Kingdom, United States, Nepal), so it spans a wide, shallow area and is drawn above panel B."))
+other_ids <- geo_ch |> filter(showcase, chain_id != fig13_id) |> arrange(showcase_rank)
+other_maps <- list()
+for (i in seq_len(nrow(other_ids))) {
+  id <- other_ids$chain_id[i]; rk <- other_ids$showcase_rank[i]
+  other_maps[[i]] <- chain_map(id)
+  save_fig(other_maps[[i]], paste0("fig_new_chain_map_", rk), width = 6.5, height = map_height(id),
+           caption = map_caption(id, paste0("Example chain map (showcase rank ", rk, " of ", nrow(filter(geo_ch, showcase)), "; selection rule in Annex A.8).")))
+}
+for (id in c(fig13_id, fig14_id, other_ids$chain_id)) {
+  ch <- filter(geo_ch, chain_id == id); st <- filter(geo_steps, chain_id == id); pts <- filter(geo_pt, chain_id == id, is_end, point_usable)
+  k <- paste0("chainmap_", id)
+  wp_num(paste0(k, "_steps"), ch$steps, "steps", "all years", "geo_chains.csv", paste0("Chain ", id, " (", clean_name(ch$end_org), "): steps"))
+  wp_num(paste0(k, "_confirmed"), sum(st$evidence == "confirmed"), "steps", "all years", "chain_steps.csv", paste0("Chain ", id, ": steps confirmed by both sides"))
+  wp_num(paste0(k, "_points"), nrow(pts), "location points", "all years", "geo_chain_points.csv", paste0("Chain ", id, ": usable points of the end activity"))
+  wp_num(paste0(k, "_points_exact"), sum(coalesce(as.character(pts$exactness), "") %in% c("1", "1.0")), "location points", "all years", "geo_chain_points.csv", paste0("Chain ", id, ": of these, marked exact"))
+}
+```
+
+```{r wp-fig15, include = FALSE}
+local_tab <- function(d) d |> filter(to_is_country) |> group_by(country = to_place) |>
+  summarise(links = sum(links), local = sum(links_receiver_registered_here), .groups = "drop") |>
+  mutate(oda = country %in% dac$iso2, share = 100 * local / links) |>
+  left_join(select(dac, iso2, dac_name = name), by = c(country = "iso2")) |> left_join(names_ne, by = c(country = "iso2")) |>
+  mutate(country_name = coalesce(dac_name, cname, country)) |> select(-dac_name, -cname)
+lt_all <- local_tab(cf); lt_25 <- local_tab(rd("country_flows_by_year.csv") |> filter(year == 2025))
+ref15 <- \(t) tibble(what = c("All countries", "ODA recipients"), local = c(sum(t$local), sum(t$local[t$oda])), links = c(sum(t$links), sum(t$links[t$oda]))) |>
+  mutate(share = 100 * local / links)
+write_csv(bind_rows(lt_all |> mutate(scope = "all years"), lt_25 |> mutate(scope = "2025")) |>
+            transmute(scope, country, country_name, oda_recipient = oda, links, local_links = local, share = round(share, 1), base_30_plus = links >= 30) |> arrange(scope, desc(share)),
+          file.path(wp_dir, "local_share_by_country.csv"), na = "")
+fig15 <- function(t, ylab_n = TRUE) {
+  d <- t |> filter(oda, links >= 30) |> arrange(share) |> mutate(lab_c = factor(country_name, country_name))
+  r <- ref15(t)
+  ggplot(d, aes(share, lab_c)) +
+    geom_col(fill = one, width = 0.7) +
+    geom_vline(data = r, aes(xintercept = share, linetype = what), colour = "grey25", linewidth = 0.4) +
+    geom_text(aes(label = pct_n_lab(share, local, links)), hjust = -0.06, size = 2.1) +
+    scale_linetype_manual(values = c(`All countries` = "22", `ODA recipients` = "solid"),
+                          labels = paste0(r$what, ": ", pct_n_lab(r$share, r$local, r$links)), name = NULL) +
+    scale_x_continuous(limits = c(0, max(d$share) * 1.5), labels = \(x) paste0(x, "%"), expand = c(0, 0)) +
+    labs(x = "Links received by an organisation registered in the recipient country (% of links to the country)", y = NULL) +
+    theme_minimal(base_size = 7.5) + theme(panel.grid.minor = element_blank(), panel.grid.major.y = element_blank(), legend.position = "bottom")
+}
+p15 <- fig15(lt_all); p15b <- fig15(lt_25)
+cap15 <- \(scope_txt, t) { r <- ref15(t); n <- sum(t$oda & t$links >= 30)
+  paste0("Share of links received by an organisation registered in the recipient country (the local share of Table 4, place level, Section 7.5), ", scope_txt, ". ",
+  "Links: network activity links to an activity in one recipient country, from all funders. Local: the receiving organisation's identifier places it in that country; this does not separate national affiliates of international organisations from independent local organisations. ",
+  "Shown: the ", n, " ODA recipients (DAC List of ODA Recipients, 2025 flows) with 30 or more links, sorted by share; labels: share (local links of all links). ",
+  "Lines: all countries, ", pct_n_lab(r$share[1], r$local[1], r$links[1]), " (including donor countries such as the Netherlands, where 'local' means something different); ODA recipients only, ",
+  pct_n_lab(r$share[2], r$local[2], r$links[2]), ". Unit: links.") }
+save_fig(p15, "fig15_local_share", width = 6.5, height = 7.6, caption = paste0("Figure 15. ", cap15("all years", lt_all)),
+  note = with(ref15(lt_all), paste0("Section 7.5 and the summary: the global value 7.6% (803 of 10,618) includes donor countries; for ODA recipients only it is ",
+    pct_n_lab(share[2], local[2], links[2]), ". The Netherlands alone has ", lt_all$local[lt_all$country == "NL"], " local links. Update the country values in the text from local_share_by_country.csv (one decimal).")))
+save_fig(p15b, "fig15b_local_share_2025", width = 6.5, height = 2.6, caption = paste0("Figure 15b. ", cap15("links with a transaction dated 2025", lt_25),
+  " Only a few countries reach 30 links in one year."),
+  note = with(list(a = ref15(lt_all), b = ref15(lt_25)), paste0("Section 7.5: the local share is higher for 2025 (ODA recipients: ", pct_n_lab(b$share[2], b$local[2], b$links[2]),
+    ") than across all years (", pct_n_lab(a$share[2], a$local[2], a$links[2]), "), on far fewer links; part of this may be a change in which links are reported in the latest year (CC-10). Treat as provisional.")))
+for (sc in c("all years", "2025")) { t <- if (sc == "2025") lt_25 else lt_all; r <- ref15(t)
+  for (j in 1:2) { k <- paste0("local_share_", c("all_countries", "oda")[j], "_", sc)
+    wp_num(k, round(r$share[j], 1), "%", sc, if (sc == "2025") "country_flows_by_year.csv" else "country_flows.csv", paste0("Local share, ", r$what[j]))
+    wp_num(paste0(k, "_local"), r$local[j], "links", sc, "country_flows.csv", paste0("Local links, ", r$what[j]))
+    wp_num(paste0(k, "_links"), r$links[j], "links", sc, "country_flows.csv", paste0("All links to one country, ", r$what[j])) }
+  for (i in which(t$oda & t$links >= 30)) { r1 <- t[i, ]
+    wp_num(paste0("local_share_", r1$country, "_", sc), round(r1$share, 1), "%", r1$country, "country_flows.csv", paste0("Local share, ", r1$country_name, " (", sc, ")"))
+    wp_num(paste0("local_share_", r1$country, "_", sc, "_n"), r1$local, "links", r1$country, "country_flows.csv", paste0("Local links, ", r1$country_name, " (", sc, ")"))
+    wp_num(paste0("local_share_", r1$country, "_", sc, "_N"), r1$links, "links", r1$country, "country_flows.csv", paste0("All links, ", r1$country_name, " (", sc, ")")) } }
+```
+
+```{r wp-local-steps, include = FALSE}
+lls <- rd("local_links_steps.csv") |> mutate(oda = to_place %in% dac$iso2,
+  steps_cat = factor(case_when(is.na(steps_from_origin) ~ "In no chain", steps_from_origin == 1 ~ "Direct from the first funder",
+                               steps_from_origin == 2 ~ "Through one intermediary", TRUE ~ "Through two or more"),
+                     c("Direct from the first funder", "Through one intermediary", "Through two or more", "In no chain")))
+agg_steps <- function(d, by, label_fun) d |> count({{ by }}, steps_cat, .drop = FALSE) |> group_by({{ by }}) |>
+  mutate(total = sum(n), share = 100 * n / total) |> ungroup() |> mutate(group = label_fun({{ by }}))
+oda_l <- filter(lls, oda)
+by_total <- bind_rows(agg_steps(mutate(lls, g = "All countries (including donor countries)"), g, identity),
+                      agg_steps(mutate(oda_l, g = "All ODA recipients"), g, identity)) |> mutate(kind = "Total")
+thr16 <- 15 # countries with at least this many local links (lowered from 30 at the author's request, 17 Nov 2026)
+big <- oda_l |> count(to_place) |> filter(n >= thr16) |> arrange(desc(n)) |> pull(to_place)
+by_ctry <- agg_steps(filter(oda_l, to_place %in% big) |> mutate(to_place = factor(to_place, big)), to_place, \(x) coalesce(dac$name[match(as.character(x), dac$iso2)], as.character(x))) |> mutate(kind = paste0("Recipient country (", thr16, "+ local links)"))
+by_origin <- agg_steps(mutate(oda_l, oc2 = coalesce(origin_country, "unknown")), oc2, \(x) x) |> mutate(kind = "Origin funder country")
+tab16 <- bind_rows(by_total, by_ctry, by_origin) |> transmute(kind, group, steps = steps_cat, links = n, total, share = round(share, 1))
+write_csv(tab16, file.path(wp_dir, "local_by_steps.csv"), na = "")
+step_col <- c("Direct from the first funder" = "#1d4f91", "Through one intermediary" = "#4a90d9", "Through two or more" = "#9ecae1", "In no chain" = "grey80")
+d16 <- bind_rows(by_total, by_ctry) |> filter(total > 0) |>
+  mutate(lab = paste0(group, " (", fmt(total), " links)"), lab = factor(lab, rev(unique(lab))))
+p16 <- ggplot(d16, aes(share, lab, fill = steps_cat)) +
+  geom_col(width = 0.65, position = position_stack(reverse = TRUE)) +
+  geom_text(aes(label = if_else(share >= 4, pct_lab(share), "")), position = position_stack(vjust = 0.5, reverse = TRUE), size = 2.2, colour = "white") +
+  scale_fill_manual(values = step_col, name = NULL, drop = TRUE) +
+  scale_x_continuous(labels = \(x) paste0(x, "%"), expand = c(0, 0)) +
+  labs(x = "Share of links received by a local organisation", y = NULL) +
+  theme_minimal(base_size = 8) + theme(panel.grid.minor = element_blank(), panel.grid.major.y = element_blank(), legend.position = "bottom",
+                                       plot.margin = margin(4, 14, 4, 4)) +
+  guides(fill = guide_legend(nrow = 2))
+oda_direct <- filter(by_total, group == "All ODA recipients")
+# Storytelling note, from the data: the most and least direct countries, the organisations passing funding on where it is least direct, and funder countries
+dir_c <- by_ctry |> filter(steps_cat == "Direct from the first funder") |> arrange(desc(share))
+low2 <- tail(dir_c, 2)
+org_nm <- rd_pq("organisations.parquet", col_select = c(org_ref, org_name))
+via <- oda_l |> filter(coalesce(dac$name[match(to_place, dac$iso2)], to_place) %in% low2$group, steps_from_origin >= 2) |>
+  left_join(org_nm, by = c(from_org = "org_ref")) |> mutate(cn = dac$name[match(to_place, dac$iso2)]) |> count(cn, org_name, sort = TRUE) |>
+  group_by(cn) |> slice_head(n = 2) |> summarise(t = paste0(cn[1], ": ", paste0(clean_name(org_name), " (", n, ")", collapse = ", ")), .groups = "drop")
+oc_dir <- by_origin |> filter(steps_cat == "Direct from the first funder", total >= 50) |> arrange(desc(share))
+story16 <- paste0("the way funding reaches local organisations differs by country. It is most often direct in ", paste0(head(dir_c$group, 2), " (", pct_lab(head(dir_c$share, 2)), ")", collapse = " and "),
+  ", and least often in ", paste0(low2$group, " (", pct_lab(low2$share), ")", collapse = " and "), ", where it mostly passes through intermediaries; there the local organisations are funded most often by ",
+  paste(via$t, collapse = "; "), " (local links with two or more steps). By origin funder country, ", paste0(c(NL = "Netherlands", GB = "United Kingdom")[oc_dir$group] |> coalesce(oc_dir$group), "-registered first funders reach local organisations directly in ",
+  pct_lab(oc_dir$share), " of links", collapse = " and "), " (the intermediaries involved include the fund managers and NGOs among the network multipliers, Section 3.4). ",
+  "This shows the Grand Bargain question can be asked of IATI data, country by country, but the numbers are small and 'direct' is from the first funder visible in IATI.")
+save_fig(p16, "fig_new_local_by_steps", width = 6.5, height = 4.4, caption = paste0(
+  "How many steps funding takes to reach local organisations (Section 7.5; the local share of Table 4, place level, by chain step, chain level). For every network link received by an organisation registered in the recipient country (as in Figure 15), ",
+  "the fewest steps from a chain origin: direct from the first funder (1 step), through one intermediary (2 steps), or through two or more. ",
+  "This follows the Grand Bargain distinction between funding that reaches local and national actors directly or through one intermediary (IASC, 2018). ",
+  "'Direct' means direct from the first funder visible in IATI: that funder may itself have been funded by an organisation that does not publish. ",
+  "Bars: all countries (including donor countries, where 'local' means something different), all ODA recipients (DAC list, 2025 flows), and the ", length(big), " ODA recipients with ", thr16,
+  " or more local links, ordered by their number of local links. The threshold was lowered from 30 to ", thr16, " so that more countries can be compared (at 30 only ",
+  sum(oda_l |> count(to_place) |> pull(n) >= 30), " countries qualify); with 15 to 30 links, one link moves a country's shares by about 3 to 7 percentage points, so differences between countries are indicative only. ",
+  "Each bar splits that group's local links by the fewest steps from the first funder, so the segments add up to 100%. ",
+  "By origin funder country: local_by_steps.csv. All years. Unit: links."),
+  note = paste0("Section 7.5 placeholder (CC-16): of the ", fmt(oda_direct$total[1]), " links received by local organisations in ODA recipient countries, ",
+    pct_lab(oda_direct$share[oda_direct$steps_cat == "Direct from the first funder"]), " come directly from the first funder visible in IATI and ",
+    pct_lab(oda_direct$share[oda_direct$steps_cat == "Through one intermediary"]), " through one intermediary. ", length(big),
+    " countries have ", thr16, " or more local links (", paste(unique(by_ctry$group), collapse = ", "), "); compare them with care, since most rest on 15 to 30 links. ",
+    "Storytelling: ", story16, " Cite IASC (2018) for the definition of direct and through one intermediary."))
+for (i in seq_len(nrow(tab16))) { r <- tab16[i, ]
+  k <- paste0("local_steps_", r$kind, "_", r$group, "_", r$steps)
+  wp_num(k, r$links, "links", if (str_starts(r$kind, "Recipient country")) r$group else "all years", "local_links_steps.csv", paste0("Links to local organisations, ", r$kind, " ", r$group, ": ", r$steps))
+  wp_num(paste0(k, "_pct"), r$share, "%", if (str_starts(r$kind, "Recipient country")) r$group else "all years", "local_links_steps.csv", paste0("Share, ", r$kind, " ", r$group, ": ", r$steps)) }
+```
+
+```{r wp-ind3-publisher, include = FALSE}
+i3p <- rd("indicator3_by_publisher.csv") |> filter(!is.na(reporting_org_ref)) # the row without a reporting-org ref is not a publisher
+ext <- read_csv("reference/external_values.csv", show_col_types = FALSE)
+ev <- \(k) ext$value[ext$key == k]
+min_n <- 30 # publishers with at least this many outgoing transactions in the setting (as asked in CC-17)
+sets17 <- list(
+  `Default: commitments and disbursements` = i3p |> filter(outgoing >= min_n) |> transmute(reporting_org_ref, publisher_group, n = outgoing, k = valid, rate = 100 * valid / outgoing, has_disbursement),
+  `Disbursements only` = i3p |> filter(disb_outgoing >= min_n) |> transmute(reporting_org_ref, publisher_group, n = disb_outgoing, k = disb_valid, rate = 100 * disb_valid / disb_outgoing, has_disbursement))
+summ17 <- imap_dfr(sets17, \(d, nm) bind_rows(
+  tibble(setting = nm, base = "Publishers with 30+ outgoing transactions", publishers = nrow(d), median = median(d$rate), zero_pct = 100 * mean(d$k == 0)),
+  if (nm != "Disbursements only") tibble(setting = nm, base = "Of these, with at least one disbursement", publishers = sum(d$has_disbursement), median = median(d$rate[d$has_disbursement]),
+         zero_pct = 100 * mean(d$k[d$has_disbursement] == 0))))
+bytype17 <- imap_dfr(sets17, \(d, nm) d |> group_by(publisher_group) |> summarise(publishers = n(), median = median(rate), zero_pct = 100 * mean(k == 0), .groups = "drop") |>
+  mutate(setting = nm)) |> filter(publishers >= 10)
+write_csv(bind_rows(summ17 |> mutate(kind = "all publishers"), bytype17 |> rename(base = publisher_group) |> mutate(kind = "by publisher type")) |>
+            mutate(across(c(median, zero_pct), \(x) round(x, 1))), file.path(wp_dir, "indicator3_by_publisher_summary.csv"))
+h17 <- imap_dfr(sets17, \(d, nm) mutate(d, setting = nm)) |>
+  mutate(bin = if_else(k == 0, "None (0%)", as.character(cut(rate, c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100), include.lowest = FALSE,
+                                                             labels = c("Above 0 to 10%", paste0(seq(10, 90, 10), " to ", seq(20, 100, 10), "%"))))),
+         bin = factor(bin, c("None (0%)", "Above 0 to 10%", paste0(seq(10, 90, 10), " to ", seq(20, 100, 10), "%"))))
+stopifnot("CC-17: a publisher falls outside the histogram bins" = !anyNA(h17$bin))
+p17 <- ggplot(h17, aes(bin, fill = bin == "None (0%)")) +
+  geom_bar(width = 0.8) +
+  geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.3, size = 2.2) +
+  facet_wrap(~setting, ncol = 1, labeller = labeller(setting = \(x) paste0(x, ": ", summ17$publishers[match(x, summ17$setting)], " publishers; median ",
+                                                                           pct_lab(summ17$median[match(x, summ17$setting)]), "; none identified: ",
+                                                                           pct_lab(summ17$zero_pct[match(x, summ17$setting)])))) +
+  scale_fill_manual(values = c(`TRUE` = "grey55", `FALSE` = one), guide = "none") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(x = "Publisher's indicator 3: outgoing transactions with a valid receiver identifier", y = "Publishers") +
+  theme_minimal(base_size = 8) + theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank(), strip.text = element_text(face = "bold", hjust = 0),
+                                       axis.text.x = element_text(angle = 30, hjust = 1))
+top17 <- slice_max(i3p, outgoing, n = 1)
+s17 <- \(set, base, k) summ17[[k]][summ17$setting == set & summ17$base == base]
+dflt <- names(sets17)[1]; dsb <- names(sets17)[2]; b30 <- "Publishers with 30+ outgoing transactions"; bdis <- "Of these, with at least one disbursement"
+save_fig(p17, "fig_new_ind3_by_publisher", width = 6.5, height = 4.6, caption = paste0(
+  "Indicator 3 for each publisher (Table 4, transaction level, Section 5.2; the publisher-level view that Section 8.1 compares with McCarthy et al., 2026). ",
+  "Each bar counts publishers (reporting organisations) by the share of their outgoing transactions that give a valid receiver identifier; grey: publishers that identify no receiver. ",
+  "Top: the default (commitments and disbursements pooled), publishers with ", min_n, " or more such transactions. Bottom: disbursements only (type 3), publishers with ", min_n, " or more disbursements. ",
+  "Counts of transactions, before any matching of receiver names, so each publisher counts once whatever its size; the largest, ", top17$reporting_org_ref, " (", fmt(top17$outgoing),
+  " outgoing transactions), gives receiver names but no receiver organisation identifier on any of them. All years. Unit: publishers; transactions. ",
+  "McCarthy et al. report a median funder identification rate of ", pct_lab(ev("mccarthy_median_funder_identification")), " and ", pct_lab(ev("mccarthy_funders_no_receiver")),
+  " of funders identifying no receiver, by value and after name matching, so the figures are not directly comparable."),
+  note = paste0("Section 8.1 placeholder (CC-17): by publisher, the median indicator 3 is ", pct_lab(s17(dflt, b30, "median")), " (default) and ", pct_lab(s17(dsb, b30, "median")),
+    " (disbursements only), and ", pct_lab(s17(dflt, b30, "zero_pct")), " and ", pct_lab(s17(dsb, b30, "zero_pct")), " of publishers identify no receiver; restricted to publishers with at least one disbursement, the default median is ",
+    pct_lab(s17(dflt, bdis, "median")), " and ", pct_lab(s17(dflt, bdis, "zero_pct")), " identify none. McCarthy et al.: ", pct_lab(ev("mccarthy_median_funder_identification")), " and ",
+    pct_lab(ev("mccarthy_funders_no_receiver")), ". The share identifying no receiver is close to theirs; the median is lower, as expected for counts before name matching. ",
+    "Replace the sentence 'these figures are not reproduced here'. By publisher type: indicator3_by_publisher_summary.csv."))
+for (i in seq_len(nrow(summ17))) { r <- summ17[i, ]; k <- paste0("ind3pub_", if (r$setting == dsb) "disb" else "default", if (r$base == b30) "_30plus" else "_30plus_with_disb")
+  wp_num(paste0(k, "_publishers"), r$publishers, "publishers", "all years", "indicator3_by_publisher.csv", paste0("Indicator 3 by publisher, ", r$setting, ", ", r$base, ": publishers"))
+  wp_num(paste0(k, "_median"), round(r$median, 1), "%", "all years", "indicator3_by_publisher.csv", paste0("Median publisher indicator 3, ", r$setting, ", ", r$base))
+  wp_num(paste0(k, "_zero_pct"), round(r$zero_pct, 1), "%", "all years", "indicator3_by_publisher.csv", paste0("Share of publishers identifying no receiver, ", r$setting, ", ", r$base)) }
+for (i in seq_len(nrow(bytype17))) { r <- bytype17[i, ]; k <- paste0("ind3pub_", if (r$setting == dsb) "disb" else "default", "_type_", gsub("[^a-z]+", "_", tolower(r$publisher_group)))
+  wp_num(paste0(k, "_median"), round(r$median, 1), "%", "all years", "indicator3_by_publisher.csv", paste0("Median publisher indicator 3, ", r$setting, ", ", r$publisher_group, " (", r$publishers, " publishers)"))
+  wp_num(paste0(k, "_zero_pct"), round(r$zero_pct, 1), "%", "all years", "indicator3_by_publisher.csv", paste0("Share identifying no receiver, ", r$setting, ", ", r$publisher_group)) }
+```
+
+*This page shows the results of the pipeline on the IATI Bulk Data Service copy whose index was created on `r substr(man$bulk_copy$index_created, 1, 10)` (pipeline code version `r man$code_version`). It reads only the pipeline's output folder. The figures are those of the working paper on network and traceability, with the paper's captions and numbers: "Section", "Table" and "Annex" in a caption refer to the paper. Interactive tabs let you explore the same data. Definitions are in `docs/methods_decisions.md` and `docs/indicators.md`, and every output column in `docs/data_dictionary.md`.*
+
+## Summary
+
+
+::: {.callout-note}
+For the key headline results, readers and users should see the final report. The points below are a selection of results, made before the final report was prepared.
+:::
+
+
+This report describes the full run of the traceability pipeline on the IATI Bulk Data Service copy whose index was created on `r substr(man$bulk_copy$index_created, 1, 10)`. It covers what each stage did to the data, the links between activities and between organizations, the chains of funding, and the indicators.
+
+- **Activities connected.** Of `r fmt(g("1")$denominator)` activities with transactions, `r fmt(g("1")$numerator)` (`r g("1")$percent`%) are connected to an activity of another organization by a plausible link (indicator 1).
+- **Chain depth.** Funding can be followed activity by activity for a mean of `r g("6")$value` steps from each origin (indicator 6). The longest chain has `r g("6c")$value` steps.
+- **Organization paths.** Counted by distinct sequences of organizations, `r g("6e")$percent`% of traceable routes have two or more steps (indicator 6e).
+- **Receiver IDs.** `r g("3")$percent`% of outgoing commitments and disbursements give a valid receiver organization ID (indicator 3), against `r g("2")$percent`% of incoming transactions giving a valid provider ID (indicator 2).
+- **The gap.** Organization IDs link `r fmt(s4$org_network$organisations)` organizations into an almost fully connected network (not counting `r fmt(s4$org_network$partner_codes_left_out)` codes that UNICEF gives its own partners). Followed activity by activity, the same funding falls apart into `r fmt(s4$activity_network$components)` separate pieces covering `r fmt(s4$activity_network$activities)` activities.
+
+## 1. Terms
+
+The counts in this report are in different units. They are not interchangeable.
+
+| Term | What it is | In the XML |
+|---|---|---|
+| **Activity** | A project or programme as published, with its own `iati-identifier`. It holds many transactions. | `<iati-activity>` |
+| **Transaction** | One financial flow in an activity: commitment, disbursement, expenditure, incoming funds. | `<transaction>` |
+| **Link** | A pair of activities (funder → receiver), connected because a transaction in one names the other's activity ID. One link usually rests on several transactions. | `provider-activity-id`, `receiver-activity-id` |
+| **Organization link** | A pair of organizations, connected because a transaction names the other's organization ID. | `provider-org ref`, `receiver-org ref` |
+| **Chain** | A sequence of links from an origin activity (no traced funder) to an end activity (no traced recipient). Length is in steps. | — |
+| **Organization path** | The sequence of organizations along a chain. Many chains can share one. | — |
+
+```{r fr-nesting}
+run_chunk("nesting")
+```
+
+```{r palette, fig.height = 2.6}
+pal <- bind_rows(
+  tibble(set = "Publisher type", cat = names(pub_group_col), col = pub_group_col),
+  tibble(set = "Funder country", cat = names(funder_col), col = funder_col),
+  tibble(set = "Link evidence", cat = names(ev_col), col = ev_col),
+  tibble(set = "Role in chain", cat = names(role_col), col = role_col)) |>
+  mutate(set = fct_inorder(set)) |> group_by(set) |> mutate(x = row_number()) |> ungroup()
+ggplot(pal, aes(x, fct_rev(set))) +
+  geom_tile(aes(fill = col), width = 0.9, height = 0.6) +
+  geom_text(aes(label = str_wrap(cat, 14)), size = 2.2, vjust = 2.6, lineheight = 0.85) +
+  scale_fill_identity() + scale_y_discrete(expand = expansion(add = c(0.6, 0.4))) +
+  labs(x = NULL, y = NULL) + theme(axis.text.x = element_blank(), panel.grid = element_blank())
+```
+
+*The colors used in every figure: one set each for publisher type, funder country, link evidence and role in a chain.*
+
+## 2. The process
+
+```{r fr-stages}
+run_chunk("stages")
+```
+
+```{r fr-files}
+run_chunk("files")
+```
+
+The stages and their settings are described in `README.md`. The pipeline ran in `r round(sum(unlist(man$seconds_per_stage)) / 60)` minutes. Package versions and every setting used are recorded in `run_manifest.json`.
+
+## 3. Links and their evidence
+
+```{r fr-links-table}
+run_chunk("links-table")
+```
+
+Of `r fmt(nrow(edges))` links, `r fmt(sum(edges$same_org))` (`r round(100 * mean(edges$same_org))`%) join two activities of the same organization; these are not used in the network. Of the `r fmt(nrow(between))` links between organizations, `r fmt(sum(between$evidence == "confirmed"))` (`r round(100 * mean(between$evidence == "confirmed"), 1)`%) are reported by both sides.
+
+The plausibility rule is set out in `docs/methods_decisions.md`, section 3.1. Under it, `r fmt(sum(!between$plausible))` links are implausible, against `r fmt(sum(!between$plausible_strict))` under the strict rule.
+
+## 4. Chain depth in three units
+
+The same chains can be counted three ways, and they give different pictures:
+
+- **Per chain:** each path counts once.
+- **Per origin:** each starting activity counts once, by its longest chain. This is the pilot's indicator 6.
+- **Per organization path:** each distinct sequence of organizations counts once.
+
+
+
+::: {.panel-tabset}
+
+### Figure
+
+```{r show-fig06, results = "asis"}
+show_fig("fig06_chain_depth")
+```
+
+### By year
+
+```{r show-fig06b, results = "asis"}
+show_fig("fig06b_chain_depth_by_year")
+```
+
+### Interactive
+
+```{r fr-depth-interactive}
+invisible(run_chunk("fig-depth"))
+run_chunk("fig-depth-interactive")
+```
+
+### Table
+
+```{r fr-depth-table}
+run_chunk("depth-table")
+```
+
+:::
+
+**Why they differ.** A few origins with many recipients dominate the count of chains. The 10 largest origins produce `r round(100 * sum(head(sort(rd("chain_origins.csv")$n_chains, decreasing = TRUE), 10)) / nrow(rd("chains.csv")))`% of all chains. Each of them repeats the same organization path many times. Counted once per organization path, `r g("6e")$percent`% of routes have two or more steps. The two diagrams below show the two extremes.
+
+```{r fr-examples-load, include = FALSE}
+invisible(run_chunk("examples-load"))
+```
+
+```{r fr-fig-fanout, fig.height = 3.4}
+run_chunk("fig-fanout")
+```
+
+```{r fr-fig-depth-group, fig.height = 4}
+run_chunk("fig-depth-group")
+```
+
+### Explore organization paths and chains
+
+Every organization path (`org_paths.csv`), and every chain of two or more steps (`chains.csv`), with search and column filters. For example, type an organization name into the search box to see every traceable route through it.
+
+::: {.panel-tabset}
+
+#### Organization paths
+
+```{r fr-paths-dt}
+run_chunk("paths-dt")
+```
+
+#### Chains of 2+ steps
+
+```{r fr-chains-dt}
+run_chunk("chains-dt")
+```
+
+:::
+
+## 5. Where chains stop
+
+For each activity that receives funds but has no onward link in the network, the reason records the best evidence its outgoing transactions give about where the money went.
+
+
+
+::: {.panel-tabset}
+
+### Figure
+
+```{r show-fig08, results = "asis"}
+show_fig("fig08_chain_ends")
+```
+
+### By year
+
+```{r show-fig08b, results = "asis"}
+show_fig("fig08b_chain_ends_by_year")
+```
+
+### Interactive
+
+```{r fr-ends-interactive}
+invisible(run_chunk("fig-ends"))
+run_chunk("fig-ends-interactive")
+```
+
+:::
+
+## 6. Organization network and activity network
+
+```{r fr-networks-table}
+run_chunk("networks-table")
+```
+
+Organization IDs place `r round(100 * s4$org_network$largest_components[[1]] / s4$org_network$organisations, 1)`% of organizations in one connected network. Only `r fmt(s4$org_network$org_edges_also_traced_by_activity_link)` of `r fmt(s4$org_network$edges)` organization links (`r round(100 * s4$org_network$org_edges_also_traced_by_activity_link / s4$org_network$edges, 1)`%) can also be followed through activity IDs. The organization network leaves out `r fmt(s4$org_network$partner_codes_left_out)` identifiers that UNICEF gives its own partners (`XM-DAC-41122-VN-…`, `config.PARTNER_CODE_PATTERN`) and their `r fmt(s4$org_network$edges_with_partner_codes_left_out)` links. They publish no activities, so the activity network does not change. The figure shows that traceable part: organizations joined by at least one activity link.
+
+
+
+::: {.panel-tabset}
+
+### Figure
+
+```{r show-fig04, results = "asis"}
+show_fig("fig04_activity_link_network")
+```
+
+### By year
+
+```{r show-fig04b, results = "asis"}
+show_fig("fig04b_activity_link_network_by_year")
+```
+
+### Interactive
+
+Zoom with the scroll wheel, drag to move. Hover over an organization to see its name, type and identifier, or select one from the list to highlight its links.
+
+```{r fr-orgnet-interactive}
+invisible(run_chunk("orgnet-build"))
+run_chunk("orgnet-interactive")
+```
+
+:::
+
+### Organizations by publisher type and as intermediaries
+
+
+```{r show-org-level, results = "asis"}
+show_fig("fig_new_org_level_summary")
+```
+
+
+```{r show-multipliers, results = "asis"}
+show_fig("fig_new_multipliers")
+```
+
+### Reach, and comparison with McCarthy et al.
+
+```{r draft-setup}
+# From the chapter draft (not in this repository): organization edges without UNICEF's partner codes
+partner_refs <- read_parquet(file.path(out, "organisations.parquet"), col_select = c(org_ref, partner_code)) |>
+  filter(partner_code) |> pull(org_ref)
+is_vendor <- \(x) x %in% partner_refs
+oe_raw <- read_parquet(file.path(out, "org_edges.parquet")) |> filter(from_org != to_org)
+```
+
+```{r c6-central-orgs}
+#| tbl-colwidths: [42,18,14,12,14]
+oe_all <- oe_raw |> filter(from_well_formed, to_well_formed, !is_vendor(from_org), !is_vendor(to_org)) |> distinct(from_org, to_org)
+g_org <- graph_from_data_frame(oe_all)
+on_all <- read_parquet(file.path(out, "org_nodes.parquet"))
+central <- tibble(org_ref = V(g_org)$name, funds = degree(g_org, mode = "out"), funded_by = degree(g_org, mode = "in"),
+                  reach = harmonic_centrality(g_org, mode = "out")) |>
+  left_join(select(on_all, org_ref, org_name, org_type), by = "org_ref") |>
+  slice_max(reach, n = 10, with_ties = FALSE) |>
+  transmute(Organisation = clean_name(org_name), Type = org_type, `Organisations funded` = fmt(funds),
+            `Funded by` = fmt(funded_by), `Reach score` = fmt(reach))
+kable(central, align = "llrrr", caption = "Table 7. Organizations that reach furthest through the organization network. Reach score: harmonic centrality, as in McCarthy et al., without their adjustment for network position. Only well-formed identifiers, without UNICEF's partner codes. Unit: organizations.")
+```
+
+```{r c6-org-compare}
+#| tbl-colwidths: [28,16,20,18,18]
+agencies <- read_csv("../reference/org_registration_agencies.csv", show_col_types = FALSE)[[1]]
+# McCarthy et al.'s rule: a ref followed by a suffix becomes the base ref if the base also occurs. Never a bare agency stem such as XM-DAC.
+merge_suffix <- function(e) {
+  u <- unique(c(e$from_org, e$to_org)); m <- setNames(u, u)
+  for (r in u[str_count(u, "-") >= 2]) {
+    p <- str_split_1(r, "-")
+    for (k in (length(p) - 1):2) {
+      b <- paste(p[1:k], collapse = "-")
+      if (b %in% u && !b %in% agencies) { m[[r]] <- b; break }
+    }
+  }
+  mutate(e, from_org = m[from_org], to_org = m[to_org]) |> filter(from_org != to_org)
+}
+net_stats <- function(e) {
+  g0 <- graph_from_data_frame(distinct(e, from_org, to_org))
+  n <- vcount(g0); h <- distance_table(g0, directed = TRUE)$res; r <- sum(h)
+  c(n, ecount(g0), 100 * r / (n * (n - 1)), sum(h * seq_along(h)) / r, length(h), 100 * max(components(g0, "weak")$csize) / n)
+}
+e_dis <- read_parquet(file.path(out, "sensitivity_disbursements_only", "org_edges.parquet")) |> filter(from_org != to_org)
+s_dis <- net_stats(merge_suffix(filter(e_dis, n_provider_transactions > 0)))
+s_both <- net_stats(merge_suffix(e_dis)); s_full <- net_stats(merge_suffix(oe_raw))
+measures <- c("Organisations", "Links", "Ordered pairs connected (%)", "Mean distance (steps)", "Longest path (steps)", "Largest connected group (%)")
+digits <- c(0, 0, 2, 2, 0, 1)
+col <- \(v) mapply(\(x, d) fmt(x, d), v, digits)
+tibble(Measure = measures, `McCarthy et al.` = col(c(22773, 28708, 1.11, 6.00, 13, 98.6)), `This chapter: same definition` = col(s_dis),
+       `Adding receiver reports` = col(s_both), `All commitments and disbursements` = col(s_full)) |>
+  kable(align = "lrrrr", caption = "Table 15. The organization network under McCarthy et al.'s definition and under wider ones. Same definition: disbursements reported by the funder, with suffixed identifiers merged as in the paper. Adding receiver reports: also incoming funds reported by the receiver. Units: organizations; links; ordered pairs of organizations.")
+```
+
+## 7. Indicators
+
+Indicator definitions, numerators, denominators and units are in `docs/indicators.md`. Rows with a denominator below 30 are flagged `small_base` in `indicators.csv`; their percentages should not be reported.
+
+```{r fr-indicators-table}
+run_chunk("indicators-table")
+```
+
+```{r fr-indicators-group}
+run_chunk("indicators-group")
+```
+
+**Sensitivity to the open questions.** Each setting was switched in turn and stage 5 rerun (`report/sensitivity.py`; results in `sensitivity.csv`).
+
+**Disbursements only.** By default, outgoing flows pool commitments and disbursements (types 2 and 3), and incoming flows pool incoming funds and incoming commitments (types 1 and 11). The McCarthy paper uses disbursements only. In this alternative, outgoing flows are disbursements (type 3) and incoming flows are incoming funds (type 1). Because this changes which links exist, the links, the network and the chains were rebuilt (stages 3–5, in `sensitivity_disbursements_only/`), so indicators 1 and 6 change too.
+
+```{r fr-sensitivity}
+run_chunk("sensitivity")
+```
+
+
+### Link quality by publisher type
+
+
+::: {.panel-tabset}
+
+### Figure
+
+```{r show-fig05, results = "asis"}
+show_fig("fig05_link_quality_by_type")
+```
+
+### By year
+
+```{r show-fig05b, results = "asis"}
+show_fig("fig05b_link_quality_by_type_by_year")
+```
+
+:::
+
+### Indicator 3 for each publisher
+
+
+```{r show-ind3, results = "asis"}
+show_fig("fig_new_ind3_by_publisher")
+```
+
+### Indicator 4 in 2025
+
+
+```{r show-ind4, results = "asis"}
+show_fig("fig_new_ind4_2025")
+```
+
+### Reporting lag
+
+```{r show-lag}
+lag |> mutate(across(where(is.double), \(x) round(x, 1))) |> kable(caption = "Reporting lag check: indicators 1, 5 and 7b by year, as published and as a lower bound without later confirmations (report/reporting_lag_check.R).")
+```
+
+
+**Explore all indicators.** Every row of `indicators.csv`, with search and column filters.
+
+```{r fr-indicators-dt}
+run_chunk("indicators-dt")
+```
+
+## 8. Example chains, with the XML behind each step
+
+
+
+```{r show-fig07, results = "asis"}
+show_fig("fig07_longest_path")
+```
+
+
+::: {.panel-tabset}
+
+### Example chains
+
+```{r show-examples, results = "asis"}
+show_figs("^fig_new_example_chain_")
+```
+
+### Counter-example
+
+```{r show-counter, results = "asis"}
+show_fig("fig_new_counter_example_chain")
+```
+
+### A traceable and a broken chain
+
+
+```{r show-case-pair, results = "asis"}
+show_fig("fig_new_case_pair")
+```
+
+### The XML behind each step
+
+```{r fr-xml-examples, results = "asis"}
+run_chunk("xml-examples")
+```
+
+All transactions shown per step, up to two per side, are in `examples/example_chains.md`.
+
+:::
+
+## 9. Traceability by recipient country
+
+Indicators 1 and 3 can be computed for each recipient country, on the same definitions as in section 7 and on the global network. A link to an activity in another country still counts. Countries are taken from the activity, or from its transactions if the activity names none. Under the rule used here (`r rule_used`), an activity or transaction that names several countries counts in each of them. Indicator 1 can be computed for `r cnt(1, "all")` countries, `r cnt(1, "base")` of them with 30 or more activities. Indicator 3 can be computed for `r cnt(3, "all")` countries, `r cnt(3, "base")` of them with 30 or more transactions. Countries with a smaller base are gray. Rules and their effect on the counts are in `docs/methods_decisions.md`, section 7.
+
+Donor countries also appear as recipients, through their domestic programmes and multi-country activities. Their shares are therefore not comparable with those of partner countries.
+
+
+
+::: {.panel-tabset}
+
+### Maps
+
+**Reading the legend.** Each color is a class of shares. A class includes its lower limit and excludes its upper limit. For example, "1 to 2%" holds shares from 1.0% up to but not including 2.0%, so a country at exactly 2.0% is in "2 to 4%". The top class includes 100%. The classes differ between the two indicators because their shares differ in size: indicator 1 is below 5% in most countries, so its classes double in width (0.5, 1, 2, 4, 8%); indicator 3 is mostly between 10% and 40%, so its classes are 10 points wide. Two gray classes are not shares: "Base below 30" means fewer than 30 activities (indicator 1) or transactions (indicator 3) are placed in the country, too few for a share; "No activities placed" means none are.
+
+```{r show-fig09, results = "asis"}
+show_fig("fig09_country_maps")
+```
+
+### 2025
+
+```{r show-fig09b, results = "asis"}
+show_fig("fig09b_country_maps_2025")
+```
+
+### Highest and lowest
+
+
+```{r show-ranked, results = "asis"}
+md9 <- readLines(file.path(wp_dir, "country_indicators_ranked.md"))
+cat(us_spell(str_replace(md9, "^#+ ", "#### ")), sep = "\n")
+```
+
+### Share and base
+
+Each point is a country with 30 or more activities (indicator 1) or transactions (indicator 3). Shares on small bases vary more, so the countries at the extremes are often small.
+
+```{r fr-fig-map-a-base, fig.height = 4}
+run_chunk("fig-map-a-base")
+```
+
+### Interactive
+
+Hover over a country for numerator / denominator (share) under each multi-country rule. Colors are those of the static maps; zoom with the mouse.
+
+```{r fr-map-interactive}
+run_chunk("fig-map-a-interactive")
+```
+
+### Multi-country rule
+
+Each point is a country with 30 or more activities or transactions under every rule. Points on the diagonal are not affected by the choice. Under "every", an activity naming several countries counts in full in each. Under "split", it is divided by its published percentages.
+
+```{r fr-fig-map-a-rules, fig.height = 4}
+run_chunk("fig-map-a-rules")
+```
+
+```{r fr-map-a-rules-table}
+run_chunk("map-a-rules-table")
+```
+
+### Not on the map
+
+```{r fr-map-a-unplaced}
+run_chunk("map-a-unplaced")
+```
+
+Country codes with no border on the map (`r nrow(distinct(off_map, country))` codes, `r fmt(sum(off_map$denominator[off_map$indicator == 1]))` activities in total): `r paste(sort(unique(off_map$country)), collapse = ", ")`. Most are outdated or mistyped codes (for example `UK`, `ZR`, `YU`). The rest are territories that the map draws as part of another country (for example `RE`, `GF`), or placeholders (`XX`, `ZZ`).
+
+:::
+
+### Method: how activities and transactions are placed in countries
+
+```{r fr-spatial-method}
+run_chunk("spatial-method")
+```
+
+The country maps need each activity and each transaction to be given one or more countries. This is done in stage 6 (`06_spatial.py`) in three steps.
+
+**Step 1: which countries.** IATI gives recipient countries at two levels: on the activity (`<recipient-country>` in `<iati-activity>`) and, less often, on single transactions. The rule is:
+
+- An **activity** is placed in the countries it names itself. If it names none, it is placed in all the countries named on its transactions in the scope. Of the `r fmt(nrow(acts_c))` activities, `r fmt(src$activity)` are placed by their own countries, `r fmt(src$transactions)` by their transactions' countries only, and `r fmt(src$none)` cannot be placed (including activities with no transactions).
+- A **transaction** is placed in its activity's countries. Only if the activity names none is the transaction's own country used. The two rarely conflict: `r fmt(n_tx_outside)` of the `r fmt(nrow(tx_c))` transactions that give a country inside an activity that also gives one name a country that their activity does not list (unit: transactions; in `r fmt(n_act_outside)` activities).
+
+This is the same rule that stage 5 uses for its country subsets (`common.transaction_countries()`). A country's indicator 1 and 3 values under the rule "every" are therefore identical to the stage 5 values for that country (checked for Uganda 2025).
+
+**Step 2: which codes are countries.** Only two-letter codes are placed on the map. The country field sometimes holds other codes, such as `GLOBAL`, region numbers (`998`) or three-letter codes (`HTI`). These are left out of the country lists and counted in the tab "Not on the map". Activities that give only a region, such as `298` "Africa, regional", are also listed there and not drawn.
+
+**Step 3: activities and transactions that name several countries.** `r fmt(n_multi)` activities name two or more countries; `r fmt(n_multi_pct)` of them give a percentage for each country. Such an activity cannot be put in one country without a rule. Stage 6 computes the indicators under three rules. The maps show the rule set in `config.MULTI_COUNTRY_RULE` (now "`r rule_used`"); the tab "Multi-country rule" compares all three.
+
+| Rule | What it does | Effect on a country's numerator and denominator |
+|---|---|---|
+| **every** | The activity (or transaction) counts **in full in every country it lists**. An activity in Kenya, Uganda and Ethiopia counts as one activity in each of the three. | Whole numbers. An activity is counted several times across countries, so country denominators add up to more than the number of activities. |
+| **single** | **Only activities (or transactions) that name exactly one country are counted.** Multi-country activities are left out of every country. | Whole numbers. Smaller denominators; multi-country programmes disappear from the map. |
+| **split** | The activity (or transaction) is **divided between its countries by the published percentages**. With 46% Kenya, it counts as 0.46 of an activity in Kenya. If the percentages are missing, or do not match the list of countries, or are not numbers, it is divided equally. | Fractions (for example 3.6 activities). Each activity adds up to exactly 1 across countries, so country denominators add up to the number of placed activities. |
+
+**A worked example.** The activity below names three countries with percentages. It is connected (it receives funds from a Danida activity through a network link), so it counts in the numerator and the denominator of indicator 1.
+
+```{r fr-spatial-method-example}
+run_chunk("spatial-method-example")
+```
+
+A transaction is treated in the same way, with its activity's countries and percentages. A commitment of this activity would count as one transaction in each of Kenya, Uganda and Ethiopia under "every"; it would be left out under "single"; and it would count as 0.46, 0.34 and 0.20 of a transaction under "split".
+
+**What the choice changes.** For most partner countries the three rules give similar shares. Uganda's indicator 1 is `r ug(1, "every")`% under "every", `r ug(1, "single")`% under "single" and `r ug(1, "split")`% under "split". Across countries with 30 or more activities, the median of indicator 1 is `r md(1, "every")`% under "every", against `r md(1, "single")`% under "single" and `r md(1, "split")`% under "split". The median of indicator 3 is `r md(3, "every")`%, `r md(3, "single")`% and `r md(3, "split")`%. The rules differ most for donor countries that are listed, often with a small percentage, in large multi-country activities. Under "every" these activities count in full in the donor country.
+
+**Why "every" is used for now.** It matches stage 5's country subsets, it keeps the counts as whole numbers, and it does not depend on percentages that publishers often omit or fill in loosely. Its drawback is that a multi-country programme carries the same weight in a country it barely touches as in its main country. "Split" corrects this, but it depends on the published percentages. The choice is open (`docs/methods_decisions.md`, section 7).
+
+**Small bases.** A country is gray ("Base below 30") when fewer than 30 activities (indicator 1) or transactions (indicator 3) are placed in it under the rule shown. A share on such a base can change by several points with one activity. Under "split", the base is the sum of the shares, so it can be a fraction. The column `records` in `country_indicators.csv` gives the number of activities or transactions behind each denominator, each counted once.
+
+## 10. Funding that reaches mapped local work
+
+Section 9 shows traceability by country. This section goes below country level. It shows chains of funding that can be followed, activity by activity, from a funder through intermediaries to an implementing organization, and that end at an activity which publishes where it works. These are rare, so the section presents **examples**, not a measure. The aim is to show what full traceability looks like when it reaches smaller, local organizations, and what is lost when it does not.
+
+- **Locations.** `r fmt(s6$locations)` locations are published for `r fmt(s6$activities_with_location)` activities (unit: locations; activities). `r fmt(s6$activities_with_valid_point)` activities give at least one valid point; `r fmt(s6$activities_with_usable_point)` give at least one usable point (inside a recipient country, below country level).
+- **In the network.** `r fmt(s6$network_activities_with_valid_point)` of the `r fmt(s6$network_activities)` activities in the network have a valid point (unit: activities).
+- **Chains.** Of `r fmt(s6$chains_min_steps)` chains of two or more steps, `r fmt(s6$chains_min_steps_end_usable)` end at an activity with a usable point, and `r fmt(s6$chains_min_steps_end_usable_local)` of these end at a local organization (unit: chains). `r fmt(probs[["no location"]])` end at an activity with no location at all.
+
+
+```{r show-loc, results = "asis"}
+show_fig("fig_new_location_precision")
+```
+
+
+::: {.panel-tabset}
+
+### Ethiopia
+
+```{r show-fig13, results = "asis"}
+show_fig("fig13_chain_ethiopia")
+```
+
+### Nepal
+
+```{r show-fig14, results = "asis"}
+show_fig("fig14_chain_nepal")
+```
+
+### Other example chains
+
+```{r show-chain-maps, results = "asis"}
+show_figs("^fig_new_chain_map_")
+```
+
+### Interactive
+
+Every candidate chain whose end activity has a usable point (`r sum(!is.na(geo_ch$showcase_rank))` chains). Click a point for the chain; larger points are the examples. The map uses the Web Mercator projection, which enlarges areas far from the equator; use it to explore, not to compare sizes. Country borders are Natural Earth, built into the report, so it works offline.
+
+```{r fr-geo-interactive}
+run_chunk("geo-interactive")
+```
+
+### All candidates
+
+```{r fr-geo-candidates}
+run_chunk("geo-candidates")
+```
+
+### Coverage
+
+```{r fr-geo-coverage}
+run_chunk("geo-coverage")
+```
+
+:::
+
+### Method: locations, the point check and the choice of examples
+
+**Locations.** Stage 6 reads the `<location>` elements of each activity directly from the XML of the bulk copy (`locations.parquet`), for the copy of the activity kept in stage 2. Version 2 gives a point as `<point><pos>latitude longitude</pos></point>`; version 1 as `<coordinates latitude longitude>`. Both are read. `<location>` elements inside results and indicators only refer back to these, and are not counted.
+
+**Valid and usable points.** A point is *valid* if latitude and longitude can be read, lie in range and are not 0,0, a common placeholder. Of the valid points, `r fmt(pts_in[["True"]])` lie inside one of their activity's recipient countries and `r fmt(pts_in[["False"]])` lie outside all of them. The check uses the Natural Earth borders of the maps, widened by about 25 km for coasts and borders (`POINT_COUNTRY_TOLERANCE_DEG`). `r fmt(s6$valid_points_country_level)` points are coded as a whole country (GeoNames feature `PCL…`). A point is *usable* for the examples if it is valid, inside a recipient country, and not country-level.
+
+**Where organizations are drawn.** IATI gives no address for organizations. Each organization is drawn at its *country of registration*: the country prefix of its identifier (`GB-CHC-…` → United Kingdom). Identifiers without a country prefix (`XM-`, `XI-`, `XR-` and legacy codes) are drawn at the organization's headquarters country in the IATI Registry, if it publishes. This covers both governments that publish under their OECD-DAC donor code (`XM-DAC-` below 900, for example `XM-DAC-7`, the Netherlands), which count as national, and international bodies (other `XM-`, `XI-` and `XR-` identifiers). Organizations in the same country are spread on a small circle. This is where an organization is registered, not where it works. Only the end activity's points (panel B) show where work happens.
+
+**Choice of examples.** Chains whose end activity has a usable point are ranked:
+
+1. the end publisher is a local organization (local government, national, regional or partner-country NGO, private sector in the recipient country);
+2. more steps confirmed by both sides;
+3. more steps;
+4. more activities on the chain with usable points.
+
+To show different routes, only the best-ranked chain is kept for each organization path, each end publisher, and each route before the end publisher. A chain that ends at an organization it already passed through is left out. The first `r length(show_ids)` are shown. The **counter-example** is the best-ranked chain by the same rules whose end activity has *no* usable point. All candidates are in the tab "All candidates" and in `geo_chains.csv`.
+
+**Reading the figures.** Panel A places the organizations of the chain by country of registration. Black arrows are traced links between activities; gray lines are other organization links of the same organizations (context, up to `r ctx_n` per chain). Panel B shows the implementer's country on an equal-area projection centred on it. The implementer is drawn at the country's label point, with arrows to the points its activity publishes: filled if marked exact (`exactness` 1), hollow if approximate or not stated. In the counter-example, a dashed red line marks the missing location.
+
+## 11. Flows between countries
+
+Section 9 maps traceability where the money goes, and section 10 follows single chains. This section asks a simpler question about the whole network: **where are funders registered, and in which countries do the activities they are linked to work?** It counts the `r fmt(fl("links"))` links in the network (unit: links; plausible links between activities of different organizations, all years).
+
+- Each link is drawn from the **country of registration of the funding organization** to the **recipient country of the receiving activity**. The country of registration is the identifier's country prefix (`GB-CHC-…` → United Kingdom); for government donors that publish under their OECD-DAC donor code (`XM-DAC-7`, the Netherlands), it is their headquarters country in the IATI Registry. This is the rule of section 10.
+- `r fmt(fl("links_to_one_country"))` links go to an activity that names exactly one country. The others go to activities that name several countries, only a region, or nothing (tab "Not drawn"), and cannot be drawn.
+- `r fmt(fl("links_funder_international"))` links are funded by **international bodies** (`XI-`, `XR-` and other `XM-` identifiers: the EU, UN agencies and pooled funds, development banks). They are counted in the tables but not drawn: a headquarters says little about where their money comes from. `r n_unknown_national <- sum(cf$links[!cf$from_international & cf$from_country == "unknown"]); fmt(n_unknown_national)` further link`r if (n_unknown_national == 1) "" else "s"` ha`r if (n_unknown_national == 1) "s" else "ve"` a funder whose country is unknown.
+- Counting all funders with a known country, `r fmt(fl("links_domestic"))` links are **domestic** (the funder is registered in the recipient country) and `r fmt(fl("links_cross_border"))` cross a border. The map shows national funders only: `r fmt(sum(placed$links[placed$domestic]))` domestic links (circles) and `r fmt(sum(placed$links[!placed$domestic]))` cross-border links, of which the 40 largest country pairs are drawn (lines; `r fmt(sum(cross$links))` links).
+- In `r fmt(fl("links_receiver_registered_in_recipient_country"))` links (`r round(100 * fl("links_receiver_registered_in_recipient_country") / fl("links_to_one_country"), 1)`% of those going to one country) the **receiving organization is registered in the recipient country**: the money reaches a local organization in a traceable way.
+
+These are links, not money: a link can rest on one transaction or many, and values are not added across currencies.
+
+
+::: {.panel-tabset}
+
+### Map with routes
+
+```{r show-fig10, results = "asis"}
+show_fig("fig10_flow_routes")
+```
+
+### Small maps
+
+```{r show-fig11, results = "asis"}
+show_fig("fig11_flow_small_maps")
+```
+
+### By year
+
+```{r show-fig11b, results = "asis"}
+show_fig("fig11b_flows_by_year")
+```
+
+### Ribbons
+
+```{r show-fig12, results = "asis"}
+show_fig("fig12_flow_sankey")
+```
+
+### Table
+
+```{r fr-flows-table}
+run_chunk("flows-table")
+```
+
+### Not drawn
+
+```{r fr-flows-not-drawn}
+run_chunk("flows-not-drawn")
+```
+
+:::
+
+### Local receivers
+
+
+::: {.panel-tabset}
+
+### By country
+
+```{r show-fig15, results = "asis"}
+show_fig("fig15_local_share")
+```
+
+### 2025
+
+```{r show-fig15b, results = "asis"}
+show_fig("fig15b_local_share_2025")
+```
+
+### Steps to local organizations
+
+```{r show-local-steps, results = "asis"}
+show_fig("fig_new_local_by_steps")
+```
+
+:::
+
+## 12. Exclusions and data issues
+
+
+```{r fr-issues}
+run_chunk("issues")
+```
+
+## 13. Citation information
+
+Please cite the pipeline and the data copy it was run on:
+
+> Bernhard, K.P. (2026). *IATI as network data: traceability pipeline*. Code repository: https://github.com/iatireport/iati-network-traceability. Results from the IATI Bulk Data Service copy of `r substr(man$bulk_copy$index_created, 1, 10)`.
+
+For the key headline results, cite the final report.
+
+## 14. Software
+
+
+```{r fr-software}
+run_chunk("software")
+```

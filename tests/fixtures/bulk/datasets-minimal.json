@@ -1,0 +1,12 @@
+{"index_created": "2026-01-15 10:00:00+00:00", "index_created_unix_timestamp": 1768471200,
+ "datasets": [
+  {"reporting_org_short_name": "donor", "short_name": "donor-activities", "source_url": "http://example.org/1"},
+  {"reporting_org_short_name": "donor", "short_name": "donor-org", "source_url": "http://example.org/2"},
+  {"reporting_org_short_name": "ngo", "short_name": "ngo-activities", "source_url": "http://example.org/3"},
+  {"reporting_org_short_name": "ngo", "short_name": "ngo-old", "source_url": "http://example.org/4"},
+  {"reporting_org_short_name": "aggregator", "short_name": "aggregator-ngo", "source_url": "http://example.org/5"},
+  {"reporting_org_short_name": "galv", "short_name": "galv-activities", "source_url": "http://example.org/6"},
+  {"reporting_org_short_name": "local", "short_name": "local-activity", "source_url": "http://example.org/7"},
+  {"reporting_org_short_name": "broken", "short_name": "broken", "source_url": "http://example.org/8"},
+  {"reporting_org_short_name": "missingpub", "short_name": "missing-1", "source_url": "http://example.org/9"}
+ ]}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture: a secondary reporter republishes B1 (newer date, fewer transactions).
+     Stage 2 keeps the primary reporter's copy. -->
+<iati-activities version="2.03">
+  <iati-activity default-currency="GBP" last-updated-datetime="2026-01-01T00:00:00">
+    <iati-identifier>GB-CHC-111-B1</iati-identifier>
+    <reporting-org ref="GB-CHC-111" type="21" secondary-reporter="1"><narrative>Intermediary NGO</narrative></reporting-org>
+    <recipient-country code="UG"/>
+    <transaction>
+      <transaction-type code="1"/>
+      <transaction-date iso-date="2025-02-15"/>
+      <value currency="USD" value-date="2025-02-15">400000</value>
+      <provider-org ref="GB-GOV-1" provider-activity-id="GB-GOV-1-A1"/>
+    </transaction>
+  </iati-activity>
+</iati-activities>

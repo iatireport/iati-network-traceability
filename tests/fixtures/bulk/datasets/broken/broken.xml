@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture: a file cut off part-way. One activity (2 transactions) is read before the error. -->
+<iati-activities version="2.03">
+  <iati-activity default-currency="GBP">
+    <iati-identifier>GB-CHC-555-Z1</iati-identifier>
+    <reporting-org ref="GB-CHC-555" type="21"/>
+    <transaction><transaction-type code="1"/><transaction-date iso-date="2025-01-01"/><value>1</value></transaction>
+    <transaction><transaction-type code="3"/><transaction-date iso-date="2025-01-02"/><value>1</value></transaction>
+  </iati-activity>
+  <iati-activity default-currency="GBP">
+    <iati-identifier>GB-CHC-555-Z2</iati-identifier>
+    <transaction><transaction-type code="1"/>

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture: intermediary. B1 receives from A1 and funds C1 (confirmed by C1).
+     It also pays an organisation by ID only, a group by name only (twice,
+     identical), and B2 spends by name only. B2 also exists in ngo-old.xml.
+     B1 has two locations: Kampala (valid point, district code) and one at "0 0"
+     (a placeholder, flagged invalid in stage 6). -->
+<iati-activities version="2.03">
+  <iati-activity default-currency="GBP" last-updated-datetime="2025-06-01T00:00:00">
+    <iati-identifier>GB-CHC-111-B1</iati-identifier>
+    <reporting-org ref="GB-CHC-111" type="21" secondary-reporter="0"><narrative>Intermediary NGO</narrative></reporting-org>
+    <title><narrative>NGO project B1</narrative></title>
+    <activity-date iso-date="2025-01-01" type="1"/>
+    <activity-date iso-date="2025-12-31" type="3"/>
+    <recipient-country code="UG"/>
+    <location ref="B1-KLA">
+      <location-reach code="1"/>
+      <name><narrative xml:lang="fr">Kampala (fr)</narrative><narrative xml:lang="en">Kampala</narrative></name>
+      <administrative vocabulary="G1" level="1" code="232422"/>
+      <administrative vocabulary="G1" level="2" code="232423"/>
+      <point srsName="http://www.opengis.net/def/crs/EPSG/0/4326"><pos>0.3476 32.5825</pos></point>
+      <exactness code="1"/>
+      <location-class code="2"/>
+      <feature-designation code="PPLC"/>
+    </location>
+    <location>
+      <name><narrative>Head office placeholder</narrative></name>
+      <point srsName="http://www.opengis.net/def/crs/EPSG/0/4326"><pos>0 0</pos></point>
+    </location>
+    <transaction>
+      <transaction-type code="1"/>
+      <transaction-date iso-date="2025-02-15"/>
+      <value currency="USD" value-date="2025-02-15">400000</value>
+      <provider-org ref="GB-GOV-1" provider-activity-id="GB-GOV-1-A1" type="10"><narrative>Donor Ministry</narrative></provider-org>
+    </transaction>
+    <transaction>
+      <transaction-type code="3"/>
+      <transaction-date iso-date="2025-05-01"/>
+      <value value-date="2025-05-01">100000</value>
+      <receiver-org ref="UG-NGB-333" receiver-activity-id="UG-NGB-333-C1" type="22"><narrative>Local Partner</narrative></receiver-org>
+    </transaction>
+    <transaction ref="PAY-1">
+      <transaction-type code="3"/>
+      <transaction-date iso-date="2025-06-01"/>
+      <value value-date="2025-06-01">5000</value>
+      <receiver-org ref="GB-CHC-999"><narrative>Partner Charity</narrative></receiver-org>
+    </transaction>
+    <transaction ref="PAY-2">
+      <transaction-type code="3"/>
+      <transaction-date iso-date="2025-06-02"/>
+      <value value-date="2025-06-02">3000</value>
+      <receiver-org><narrative>Village Group</narrative></receiver-org>
+    </transaction>
+    <transaction ref="PAY-2">
+      <transaction-type code="3"/>
+      <transaction-date iso-date="2025-06-02"/>
+      <value value-date="2025-06-02">3000</value>
+      <receiver-org><narrative>Village Group</narrative></receiver-org>
+    </transaction>
+  </iati-activity>
+  <iati-activity default-currency="GBP" last-updated-datetime="2025-09-01T00:00:00">
+    <iati-identifier>GB-CHC-111-B2</iati-identifier>
+    <reporting-org ref="GB-CHC-111" type="21"><narrative>Intermediary NGO</narrative></reporting-org>
+    <title><narrative>NGO project B2</narrative></title>
+    <activity-date iso-date="2025-01-01" type="1"/>
+    <activity-date iso-date="2025-12-31" type="3"/>
+    <recipient-country code="KE"/>
+    <related-activity ref="GB-CHC-111-B1" type="3"/>
+    <related-activity ref="GB-GOV-1-A1" type="1"/>
+    <transaction>
+      <transaction-type code="4"/>
+      <transaction-date iso-date="2025-07-01"/>
+      <value value-date="2025-07-01">1000</value>
+      <receiver-org><narrative>Field staff</narrative></receiver-org>
+    </transaction>
+  </iati-activity>
+</iati-activities>

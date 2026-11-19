@@ -1,0 +1,540 @@
+prefix,name,status
+AD-COA,Andorra Chart of Accounts,active
+AE-ACCI,Ajman Chamber of Commerce and Industry,active
+AE-ADCD,Abu Dhabi Commercial Directory,active
+AE-AFZ,Ajman Free Zone Authority,active
+AE-COA,United Arab Emirates (the) Chart of Accounts,active
+AE-DCCI,Dubai Chamber of Commerce and Industry ,active
+AE-DFSA,Dubai Financial Services Authority ,active
+AE-DIFC,Dubai International Financial Centre,active
+AE-DMCC,Dubai Multi Commodities Centre,active
+AE-FCCI,Fujairah Chamber of Commerce and Industry,active
+AE-FFZ,Fujairah Free Zone Company Listing,active
+AE-HFZA,Hamriyah Free Zone Authority,active
+AE-RAKIA,Ras al-Khaimah Investment Authority,active
+AE-RK_CR,Ras al-Khaimah Chamber of Commerce and Industry,active
+AE-SAIF,Sharjah Airport International Free Zone,active
+AE-SCCI,Sharjah Chamber of Commerce and Industry,active
+AE-UQCCI,Umm al-Quwain Chamber of Commerce and Industry,active
+AF-CBR,Afghanistan Central Business Registry,active
+AF-COA,Afghanistan Chart of Accounts,active
+AF-MOE,Ministry of Economy NGO Department ,active
+AF-TIN,Afghanistan Tax Identification Number,active
+AG-COA,Antigua and Barbuda Chart of Accounts,active
+AI-COA,Anguilla Chart of Accounts,active
+AL-COA,Albania Chart of Accounts,active
+AL-QKB,Albanian National Business Center,active
+AM-COA,Armenia Chart of Accounts,active
+AM-SRALE,State Register Agency of Legal Entities of Armenia,active
+AO-COA,Angola Chart of Accounts,active
+AQ-COA,Antarctica Chart of Accounts,active
+AR-CENOC,The National Centre of Community Organisations (Argentina),active
+AR-COA,Argentina Chart of Accounts,active
+AR-CUIT,Unique Tax Identification Code (Argentina),active
+AS-COA,American Samoa Chart of Accounts,active
+AT-COA,Austria Chart of Accounts,active
+AT-FB,Austria Company Register,active
+AT-UID,VAT number (Austria Company Register),active
+AT-ZVR,Austrian Central Register of Associations,active
+AU-ABN,Australian Business Register,active
+AU-ACNC,Australian Charities and Not-for-profits Commission,active
+AU-COA,Australia Chart of Accounts,active
+AW-COA,Aruba Chart of Accounts,active
+AX-COA,Åland Islands Chart of Accounts,active
+AZ-COA,Azerbaijan Chart of Accounts,active
+AZ-IVI,State Register of Commercial Entities (Ministry of Taxes of Azerbaijan Republic),active
+BA-COA,Bosnia and Herzegovina Chart of Accounts,active
+BB-COA,Barbados Chart of Accounts,active
+BD-COA,Bangladesh Chart of Accounts,active
+BD-NAB,Bangladesh NGO Affairs Bureau ,active
+BD-ROC,Bangladesh Office of the Register of Joint Stock Companies and Firms ,active
+BE-BCE_KBO,Crossroads Bank for Enterprises ,active
+BE-COA,Belgium Chart of Accounts,active
+BE-GTCF,Au Greffe du Tribunal de Commerce Francophone de Bruxelles,withdrawn
+BF-COA,Burkina Faso Chart of Accounts,active
+BF-MATD,Ministry of Territorial Administration and Decentralisation,active
+BG-COA,Bulgaria Chart of Accounts,active
+BG-EIK,Commercial Register,active
+BH-COA,Bahrain Chart of Accounts,active
+BI-COA,Burundi Chart of Accounts,active
+BI-NIF,"Tax Identification Number, Burundi",active
+BJ-COA,Benin Chart of Accounts,active
+BJ-IFU,Unique Tax Identifier,active
+BL-COA,Saint Barthélemy Chart of Accounts,active
+BM-COA,Bermuda Chart of Accounts,active
+BN-COA,Brunei Darussalam Chart of Accounts,active
+BO-CINS,Bolivia Institutional Classifier,active
+BO-COA,Bolivia (Plurinational State of) Chart of Accounts,active
+BO-NIT,Tax Identification Number,active
+BQ-COA,"Bonaire, Sint Eustatius and Saba Chart of Accounts",active
+BR-CNPJ,National Registry of Legal Entities,active
+BR-COA,Brazil Chart of Accounts,active
+BS-COA,Bahamas (the) Chart of Accounts,active
+BT-COA,Bhutan Chart of Accounts,active
+BV-COA,Bouvet Island Chart of Accounts,active
+BW-CIPA,Companies and Intellectual Property Authority (Botswana),active
+BW-COA,Botswana Chart of Accounts,active
+BW-TIN,Botswana Taxpayers Identification Number,active
+BY-ADR,Unified State Register of Legal Entities and Individual Entrepreneurs (Ministry of Justice of the Republic of Belarus),active
+BY-COA,Belarus Chart of Accounts,active
+BZ-COA,Belize Chart of Accounts,active
+CA-CC,Corporations Canada,active
+CA-COA,Canada Chart of Accounts,active
+CA-CRA_ACR,Canadian Revenue Agency ,active
+CA-GOV,List of legal department names (Government of Canada),active
+CA_AB-ABT,Corporate Registry Office ,active
+CA_BC-BRC_CBR,British Columbia Corporate Registry ,active
+CA_MB-MTB,"Manitoba Companies Office, Department of Entrepreneurship, Training and Trade ",active
+CA_NB-NWB_NOB,Corporate Registry ,active
+CA_NL-NFL_TNL,"Registry of Companies, Department of Government Services",active
+CA_NS-NVS_NVE,Nova Scotia Registry of Joint Stock Companies ,active
+CA_NT-NWT_TNO,Canadian Provincial Corporate Registration - Northwest Territories ,active
+CA_NU-NNV,Nunavut Department of Justice - Corporate Registries,active
+CA_ON-ONT,"ServiceOntario, Ministry of Government Services ",active
+CA_PE-PEI_IPE,Prince Edward Island Corporate,active
+CA_QC-QBC,Quebec Business Registrar ,active
+CA_SK-SKN,Saskatchewan Corporate Registry ,active
+CA_YT-YKT,Yukon Corporate Affairs ,active
+CC-COA,Cocos (Keeling) Islands (the) Chart of Accounts,active
+CD-COA,Congo (the Democratic Republic of the) Chart of Accounts,active
+CD-MJDH,Ministry of Justice and Human Rights,active
+CF-COA,Central African Republic (the) Chart of Accounts,active
+CG-COA,Congo (the) Chart of Accounts,active
+CH-COA,Switzerland Chart of Accounts,active
+CH-FDJP,"Commercial Registry, Federal Office of Justice (Switzerland)",active
+CH_BS-CR,"Commercial Register of the Canton of Basel-Stadt, Switzerland",active
+CI-COA,Côte d'Ivoire Chart of Accounts,active
+CI-MOI,Ministry of the Interior (Ivory Coast),active
+CK-COA,Cook Islands (the) Chart of Accounts,active
+CL-COA,Chile Chart of Accounts,active
+CL-MP,"Public Market Suppliers and Buyer Units, Chile",active
+CL-RUT,Rol Único Tributario de Chile (Taxpayer Number),active
+CM-COA,Cameroon Chart of Accounts,active
+CM-NIU,Tax Identification Number (Cameroon),active
+CN-COA,China Chart of Accounts,active
+CN-SAIC,State Administration for Industry and Commerce (SAIC),active
+CN-USCI,Unified Social Credit Identifier,active
+CO-CCB,Bogota Chamber of Commerce ,active
+CO-COA,Colombia Chart of Accounts,active
+CO-RUE,Unified Commercial and Social Registry (RUES) ,active
+CR-COA,Costa Rica Chart of Accounts,active
+CR-RPJ,Registro de Personas Jurídicas (Costa Rica),active
+CU-COA,Cuba Chart of Accounts,active
+CV-COA,Cabo Verde Chart of Accounts,active
+CW-COA,Curaçao Chart of Accounts,active
+CX-COA,Christmas Island Chart of Accounts,active
+CY-COA,Cyprus Chart of Accounts,active
+CY-DRCOR,Cyprus Department of Registrar of Companies and Official Receiver (DRCOR),active
+CZ-COA,Czechia Chart of Accounts,active
+CZ-DIC,Tax ID (DIČ) Czech Republic,active
+CZ-ICO,Access to Registers of Economic Subjects ,active
+DE-COA,Germany Chart of Accounts,active
+DE-CR,Common Register Portal of the German Federal States (CRP),active
+DJ-COA,Djibouti Chart of Accounts,active
+DK-COA,Denmark Chart of Accounts,active
+DK-CVR,Danish Central Business Register,active
+DM-COA,Dominica Chart of Accounts,active
+DO-COA,Dominican Republic (the) Chart of Accounts,active
+DZ-COA,Algeria Chart of Accounts,active
+EC-COA,Ecuador Chart of Accounts,active
+EC-RUC,Ecuador Unique Taxpayer Registry,active
+EE-COA,Estonia Chart of Accounts,active
+EE-KMKR,e-Business Register (Estonia),active
+EE-RIK,Centre of Registers and Information Systems (RIK),active
+EG-COA,Egypt Chart of Accounts,active
+EG-CR,"Commercial Registry, Egypt",active
+EG-MOSS,Ministry of Social Solidarity and Justice (Egypt),active
+EH-COA,Western Sahara Chart of Accounts,active
+ER-COA,Eritrea Chart of Accounts,active
+ES-COA,Spain Chart of Accounts,active
+ES-DIR3,Common Directory of Organizational Units and Offices - DIR3,active
+ES-MDJ,"Ministry of Justice, Spain",active
+ES-NIF,Tax Identification Number,active
+ES-RMC,Central Commercial Register of the Kingdom of Spain,active
+ET-COA,Ethiopia Chart of Accounts,active
+ET-CSA,Charities and Societies Agency (Ethiopia),active
+ET-MFA,Ministry of Foreign Affairs,active
+ET-MOT,Ministry of Trade (Ethiopia),active
+FI-COA,Finland Chart of Accounts,active
+FI-PRO,Finnish Patent and Registration Office ,active
+FI-VERO,Finnish Tax Administration,active
+FJ-COA,Fiji Chart of Accounts,active
+FK-COA,Falkland Islands (the) [Malvinas] Chart of Accounts,active
+FM-COA,Micronesia (Federated States of) Chart of Accounts,active
+FO-COA,Faroe Islands (the) Chart of Accounts,active
+FR-COA,France Chart of Accounts,active
+FR-INSEE,The National Institute of Statistics and Economic Studies ,withdrawn
+FR-RCS,Trade and Companies Register ,active
+GA-COA,Gabon Chart of Accounts,active
+GB-CASC,Community amateur sports clubs (CASCs) registered with HMRC,active
+GB-CHC,Charity Commission/Comisiwn Elusennau,active
+GB-COA,United Kingdom of Great Britain and Northern Ireland (the) Chart of Accounts,active
+GB-COE,Church of England Church Codes,active
+GB-COH,Companies House,active
+GB-EDU,Register of Schools (England and Wales),active
+GB-GOR,Government Organisation Register,active
+GB-GOV,UK Government Departments Reference Numbers (IATI Standard),active
+GB-GOVUK,"GOV.UK - UK Government Departments, Agencies & Public Bodies",withdrawn
+GB-HESA,Higher Education Statistics Agency,active
+GB-IRN,"Schools Plus, Department of Education (Northern Ireland)",active
+GB-LAE,Local Authorities for England Register,active
+GB-LANI,Local authorities for Northern Ireland register,active
+GB-LAS,Scottish Local Authority Register,active
+GB-MPR,Mutuals Public Register,active
+GB-NHS,NHS Digital - Organisation Data Service,active
+GB-NIC,The Charity Commission for Northern Ireland,active
+GB-PLA,Principal Local Authority Register for Wales,active
+GB-REV,HM Revenue and Customs,active
+GB-SC,Scottish Charity Register,active
+GB-SCOTEDU,Register of Schools (Scotland),active
+GB-SHPE,Registered Social Housing Providers (England),active
+GB-SRS,"Supplier Registration Service, Crown Commercial Service, UK",active
+GB-UKPRN,UK Register of Learning Providers,active
+GB-WALEDU,Register of Schools (Wales),active
+GD-COA,Grenada Chart of Accounts,active
+GE-COA,Georgia Chart of Accounts,active
+GE-NAPR,"Register of Entrepreneurial and Non-Entrepreneurial Legal Entities, Georgia",active
+GE-RS,Georgian Revenue Service,active
+GF-COA,French Guiana Chart of Accounts,active
+GG-COA,Guernsey Chart of Accounts,active
+GG-RCE,Guernsey Registry,active
+GH-COA,Ghana Chart of Accounts,active
+GH-DSW,Department of Social Developments,active
+GH-RGD,Registrar General's Department,active
+GI-COA,Gibraltar Chart of Accounts,active
+GL-COA,Greenland Chart of Accounts,active
+GM-COA,Gambia (the) Chart of Accounts,active
+GN-COA,Guinea Chart of Accounts,active
+GP-COA,Guadeloupe Chart of Accounts,active
+GQ-COA,Equatorial Guinea Chart of Accounts,active
+GR-COA,Greece Chart of Accounts,active
+GS-COA,South Georgia and the South Sandwich Islands Chart of Accounts,active
+GT-CISP,Public Sector Institution Classifications (Guetmala),active
+GT-COA,Guatemala Chart of Accounts,active
+GT-NIT,Guatemala Tax Identification Number,active
+GT-RPJ,Registry for Legal Entities (Guatemala),active
+GU-COA,Guam Chart of Accounts,active
+GW-COA,Guinea-Bissau Chart of Accounts,active
+GY-COA,Guyana Chart of Accounts,active
+HK-COA,Hong Kong Chart of Accounts,active
+HK-CR,Hong Kong Companies Register,active
+HM-COA,Heard Island and McDonald Islands Chart of Accounts,active
+HN-COA,Honduras Chart of Accounts,active
+HN-RTN,National Tax Registry,active
+HR-COA,Croatia Chart of Accounts,active
+HR-MBS,Croatian Court Business Register,active
+HR-OIB,Croatia Court Register,active
+HT-COA,Haiti Chart of Accounts,active
+HU-AFA,Information and Electronic Company Registration Service,active
+HU-COA,Hungary Chart of Accounts,active
+ID-COA,Indonesia Chart of Accounts,active
+ID-DJP,Director General of Taxes,active
+ID-KDN,Ministry of Home Affairs ,withdrawn
+ID-KHH,Ministry of Justice & Human Rights,active
+ID-KLN,Ministry of Foreign affairs,active
+ID-PRO,Indonesia - NGOs registered at Provinicial Level,withdrawn
+ID-SMR,The SMERU Research Institute,active
+IE-CHY,Charities Regulatory Authority of Ireland,active
+IE-COA,Ireland Chart of Accounts,active
+IE-CRO,Irish CompaniesRegistration Office,active
+IL-COA,Israel Chart of Accounts,active
+IL-RA,Israel Charity Registry,active
+IL-ROC,Registrar of Companies (Israel),active
+IM-COA,Isle of Man Chart of Accounts,active
+IM-CR,Isle of Man Companies Registry,active
+IM-GR,Isle of Man Index of Registered Charities ,active
+IN-COA,India Chart of Accounts,active
+IN-MCA,"Government of India, Ministry of Corporate Affairs",active
+IN-MHA,Ministry of Home Affairs (India) Foreign Contributions (Regulation) Act Register,active
+IO-COA,British Indian Ocean Territory (the) Chart of Accounts,active
+IQ-COA,Iraq Chart of Accounts,active
+IQ-NGO,NGO Directorate (Republic of Iraq),active
+IR-COA,Iran (Islamic Republic of) Chart of Accounts,active
+IS-COA,Iceland Chart of Accounts,active
+IS-KEN,Icelandic Social Security Number,active
+IT-CF,Italian Tax Code / VAT Number,active
+IT-COA,Italy Chart of Accounts,active
+IT-CUUO,Unique Organizational Unit Code,active
+IT-RI,Business Register of the Italian Chambers of Commerce,withdrawn
+JE-COA,Jersey Chart of Accounts,active
+JE-FSC,Jersey Financial Services Commission (JFSC),active
+JE-JCR,Jersey Charity Register,active
+JE-OAC,Jersey Overseas Aid Commission,withdrawn
+JM-COA,Jamaica Chart of Accounts,active
+JO-CCD,Companies Control Department (Jordan),active
+JO-COA,Jordan Chart of Accounts,active
+JO-MSD,"Register of Associations, Jordan",active
+JP-COA,Japan Chart of Accounts,active
+JP-JCN,National Tax Agency Corporate Number Publication Site,active
+KE-COA,Kenya Chart of Accounts,active
+KE-KRA,Kenya Revenue Authority PIN,active
+KE-NCB,NGO's Coordination Board,active
+KE-RCO,Registar of Companies,active
+KE-RSO,Registrar of Societies,withdrawn
+KG-COA,Kyrgyzstan Chart of Accounts,active
+KG-ID,Electronic database of legal entities and branches (Krygyzstan),active
+KG-INN,Kyrgyz Republic Register of Legal Entities,active
+KG-OKPO,Electronic database of legal entities and branches (Krygyzstan) OKPO codes,active
+KG-TIN,Electronic database of legal entities and branches (Krygyzstan) TIN,active
+KH-COA,Cambodia Chart of Accounts,active
+KH-INGO,Ministry of Foreign Affairs,active
+KH-NNGO,Ministry of Interior National NGO Registrar,active
+KI-COA,Kiribati Chart of Accounts,active
+KM-COA,Comoros (the) Chart of Accounts,active
+KN-COA,Saint Kitts and Nevis Chart of Accounts,active
+KP-COA,Korea (the Democratic People's Republic of) Chart of Accounts,active
+KR-BRN,National Tax Service Business Registration Number,active
+KR-COA,Korea (the Republic of) Chart of Accounts,active
+KW-COA,Kuwait Chart of Accounts,active
+KY-COA,Cayman Islands (the) Chart of Accounts,active
+KZ-BIN,Business Identification Number (BIN),active
+KZ-COA,Kazakhstan Chart of Accounts,active
+LA-COA,Lao People's Democratic Republic (the) Chart of Accounts,active
+LB-COA,Lebanon Chart of Accounts,active
+LB-CR,"Lebanese Ministry of Justice, Commercial Register",active
+LB-MOI,Ministry of Interior (Lebanon),active
+LC-COA,Saint Lucia Chart of Accounts,active
+LI-COA,Liechtenstein Chart of Accounts,active
+LK-COA,Sri Lanka Chart of Accounts,active
+LK-DRC,Department of the Registrar of Companies (Sri Lanka),active
+LK-NGO,Sri Lanka - National Secretariat for Non-Governmental Organisations,active
+LR-COA,Liberia Chart of Accounts,active
+LR-MFDPNGO,Ministry of Finance and Development Planning NGO,active
+LS-COA,Lesotho Chart of Accounts,active
+LS-LCN,Lesotho Council of Non Governmental Organisations,withdrawn
+LT-COA,Lithuania Chart of Accounts,active
+LT-PVM,Lithuanian State Tax Inspectorate (PVM),active
+LT-RC,Information Platform of Legal Entities (Lithuania),active
+LU-COA,Luxembourg Chart of Accounts,active
+LU-RCS,Luxembourg Trade and Companies Register,active
+LV-COA,Latvia Chart of Accounts,active
+LV-RE,Register of Enterprises of the Republic of Latvia,active
+LY-COA,Libya Chart of Accounts,active
+MA-COA,Morocco Chart of Accounts,active
+MC-COA,Monaco Chart of Accounts,active
+MC-RCI,Trade and Industry Registry Number,active
+MD-COA,Moldova (the Republic of) Chart of Accounts,active
+MD-IDNO,Legal entity registration number (IDNO) Moldova,active
+ME-COA,Montenegro Chart of Accounts,active
+MF-COA,Saint Martin (French part) Chart of Accounts,active
+MG-COA,Madagascar Chart of Accounts,active
+MG-NIF,Directorate General of Taxes,active
+MH-COA,Marshall Islands (the) Chart of Accounts,active
+MK-COA,North Macedonia Chart of Accounts,active
+ML-CCIM,The Chamber of Commerce and Industry of Mali,active
+ML-COA,Mali Chart of Accounts,active
+ML-MAT,Ministere de l'Administration Territoriale ,active
+ML-NIF,Tax Identification Number,active
+MM-COA,Myanmar Chart of Accounts,active
+MM-MHA,Ministry of Home Affairs - Central Committee for the Registration and Supervision of Organisations,active
+MN-COA,Mongolia Chart of Accounts,active
+MO-COA,Macao Chart of Accounts,active
+MP-COA,Northern Mariana Islands (the) Chart of Accounts,active
+MQ-COA,Martinique Chart of Accounts,active
+MR-COA,Mauritania Chart of Accounts,active
+MS-COA,Montserrat Chart of Accounts,active
+MT-COA,Malta Chart of Accounts,active
+MU-COA,Mauritius Chart of Accounts,active
+MU-CR,"Companies and Businesses Registration Integrated System, Mauritius",active
+MV-COA,Maldives Chart of Accounts,active
+MW-CNM,The Council for Non Governmental Organisations in Malawi,withdrawn
+MW-COA,Malawi Chart of Accounts,active
+MW-MRA,Malawi Revenue Authority,withdrawn
+MW-NBM,NGO Board of Malawi,active
+MW-RG,"Registrar General, Department of Justice",active
+MX-CMX_CPA,Budget Classification of Public Entities (Mexico City),active
+MX-COA,Mexico Chart of Accounts,active
+MX-CPA,Budget Classification of Public Entities (Mexico),active
+MX-RFC,Federal Taxpayers Registry,active
+MY-COA,Malaysia Chart of Accounts,active
+MY-SSM,Companies Commission of Malaysia,active
+MZ-COA,Mozambique Chart of Accounts,active
+MZ-CR,Mozambique Commercial Registry,active
+MZ-MOJ,Mozambique Ministry of Justice,active
+MZ-NUIT,Taxpayer Single Identification Number (Mozambique),active
+NA-COA,Namibia Chart of Accounts,active
+NA-NAMRA,Namibia Revenue Agency ,active
+NC-COA,New Caledonia Chart of Accounts,active
+NE-COA,Niger (the) Chart of Accounts,active
+NE-DGI,Tax Directorate,active
+NF-COA,Norfolk Island Chart of Accounts,active
+NG-BPP,Bureau of Public Procurement (BPP) Contractor Registration System (Nigeria),active
+NG-CAC,Nigerian Corporate Affairs Commission,active
+NG-COA,Nigeria Chart of Accounts,active
+NG-TIN,Taxpayer Identification Number,active
+NI-COA,Nicaragua Chart of Accounts,active
+NL-COA,Netherlands (the) Chart of Accounts,active
+NL-KVK,Chamber of Commerce (Netherlands),active
+NL-OWMS,Overheid.nl Web Metadata Standard ,active
+NO-BRC,Brønnøysundregistrene,active
+NO-COA,Norway Chart of Accounts,active
+NP-COA,Nepal Chart of Accounts,active
+NP-CRO,Company Registrar Office,active
+NP-IRD,Inland Revenue Department,active
+NP-SWC,Social Welfare Council Nepal,active
+NR-COA,Nauru Chart of Accounts,active
+NU-COA,Niue Chart of Accounts,active
+NZ-COA,New Zealand Chart of Accounts,active
+OM-COA,Oman Chart of Accounts,active
+PA-COA,Panama Chart of Accounts,active
+PA-PRP,Public Registry of Panama,active
+PE-COA,Peru Chart of Accounts,active
+PE-RUC,RUC Number (Peru),active
+PE-SUNARP,Peruvian National Superintendency of Public Registries - Registered Legal Entities ,active
+PF-COA,French Polynesia Chart of Accounts,active
+PG-COA,Papua New Guinea Chart of Accounts,active
+PH-COA,Philippines (the) Chart of Accounts,active
+PH-SEC,Securities and Exchange Commission (Philippines),active
+PK-COA,Pakistan Chart of Accounts,active
+PK-NTN,Pakistan National Tax Number,active
+PK-PCP,Pakistan Centre for Philanthropy,withdrawn
+PK-SEC,Securities and Exchange Commission of Pakistan,active
+PK-VSWA,Pakistan Voluntary Social Welfare Agency,active
+PL-COA,Poland Chart of Accounts,active
+PL-KRS,The National Court Register (Poland),active
+PL-NIP,Tax Identification Number (Poland),active
+PL-REGON,REGON - Statistical number of an economy entity,active
+PM-COA,Saint Pierre and Miquelon Chart of Accounts,active
+PN-COA,Pitcairn Chart of Accounts,active
+PR-COA,Puerto Rico Chart of Accounts,active
+PS-COA,"Palestine, State of Chart of Accounts",active
+PS-MOI,Ministry of Interior (Palestine),active
+PS-TIN,"Tax Identifier Number, Palestine",active
+PT-COA,Portugal Chart of Accounts,active
+PT-NIPPC,Portal of Public Services,active
+PW-COA,Palau Chart of Accounts,active
+PY-COA,Paraguay Chart of Accounts,active
+PY-PGN,Classification of Entities in the National Budget for Paraguay,active
+PY-RUC,"Unique Taxpayer Registry, Paraguay",active
+QA-COA,Qatar Chart of Accounts,active
+RE-COA,Réunion Chart of Accounts,active
+RO-COA,Romania Chart of Accounts,active
+RO-CUI,National Trade Register (Romania),active
+RS-APR,Serbian Business Registrations Agency ,active
+RS-COA,Serbia Chart of Accounts,active
+RS-PIB,Tax identification number register,active
+RU-COA,Russian Federation (the) Chart of Accounts,active
+RU-INN,Uniform State Register of Legal Entities of Russian Federation,active
+RU-OGRN,"Unified State Register of Legal Entities (USRLE), Russian Federation",active
+RW-COA,Rwanda Chart of Accounts,active
+RW-RGB,Rwanda Governance Board,active
+RW-RRA,Rwanda Revenue Authority,active
+SA-COA,Saudi Arabia Chart of Accounts,active
+SB-COA,Solomon Islands Chart of Accounts,active
+SC-COA,Seychelles Chart of Accounts,active
+SD-COA,Sudan (the) Chart of Accounts,active
+SE-BLV,Bolagsverket ,withdrawn
+SE-COA,Sweden Chart of Accounts,active
+SE-KK,"Legal, Financial and Administrative Services Agency (Sweden)",withdrawn
+SE-ON,"Business Registration Number (Organisationsnummer), Sweden",active
+SG-ACRA,Accounting and Corporate Regulatory Authority (ACRA),active
+SG-COA,Singapore Chart of Accounts,active
+SG-COC,Commissioner of Charities,active
+SH-COA,"Saint Helena, Ascension and Tristan da Cunha Chart of Accounts",active
+SI-COA,Slovenia Chart of Accounts,active
+SI-PRS,Slovenian Business Register,active
+SI-TIN,Tax Identification Number (Slovenia),active
+SJ-COA,Svalbard and Jan Mayen Chart of Accounts,active
+SK-COA,Slovakia Chart of Accounts,active
+SK-ICO,"Organization Identification Number - Register and identifier of legal entities, entrepreneurs and public authorities",active
+SK-ORSR,Ministry of Justice Business Register,active
+SK-ZRSR,Slovakia Ministry Of Interior Trade Register,withdrawn
+SL-COA,Sierra Leone Chart of Accounts,active
+SL-NRA,National Revenue Agency,active
+SL-OARG,Office of Administrator and Registrar General,active
+SM-COA,San Marino Chart of Accounts,active
+SN-COA,Senegal Chart of Accounts,active
+SN-NINEA,"National Identification Number of Companies and Associations (NINEA), Senegal",active
+SO-COA,Somalia Chart of Accounts,active
+SO-MPND,Ministry of Planning and National Development - General Register for Non-Governmental Organizations (Somaliland),active
+SR-COA,Suriname Chart of Accounts,active
+SS-COA,South Sudan Chart of Accounts,active
+SS-RRC,South Sudan Relief and Rehabilitation Commission,active
+ST-COA,Sao Tome and Principe Chart of Accounts,active
+SV-COA,El Salvador Chart of Accounts,active
+SV-NIT,Tax Identification Number (El Salvador),active
+SX-COA,Sint Maarten (Dutch part) Chart of Accounts,active
+SY-COA,Syrian Arab Republic (the) Chart of Accounts,active
+SZ-CIT,"Ministry of Commerce, Industry and Trade, Eswatini",active
+SZ-COA,Eswatini Chart of Accounts,active
+TC-COA,Turks and Caicos Islands (the) Chart of Accounts,active
+TD-COA,Chad Chart of Accounts,active
+TF-COA,French Southern Territories (the) Chart of Accounts,active
+TG-COA,Togo Chart of Accounts,active
+TH-COA,Thailand Chart of Accounts,active
+TH-MOI,Ministry of Interior of the Kingdom of Thailand,active
+TH-TIN,Thai Revenue Department - Tax Identification Number,active
+TJ-COA,Tajikistan Chart of Accounts,active
+TK-COA,Tokelau Chart of Accounts,active
+TL-COA,Timor-Leste Chart of Accounts,active
+TM-COA,Turkmenistan Chart of Accounts,active
+TN-COA,Tunisia Chart of Accounts,active
+TN-RNE,"The National Register of Companies, Tunisia",active
+TO-COA,Tonga Chart of Accounts,active
+TR-COA,Turkey Chart of Accounts,active
+TR-MERSIS,MERSIS - Central Trade Registry System,active
+TR-MOI,"Department of Associations (Ministry of Interior, Turkey)",active
+TT-COA,Trinidad and Tobago Chart of Accounts,active
+TV-COA,Tuvalu Chart of Accounts,active
+TW-COA,Taiwan (Province of China) Chart of Accounts,active
+TZ-BRLA,Tanzania Business Registrations and Licensing Agency,active
+TZ-COA,"Tanzania, the United Republic of Chart of Accounts",active
+TZ-NNCB,Tanzania National NGO Coordination Board,active
+TZ-TRA,Tanzania Revenue Agency,active
+UA-COA,Ukraine Chart of Accounts,active
+UA-EDR,United State Register ,active
+UG-204CBO,"CBO Registration number, Uganda (Jinja District)",active
+UG-COA,Uganda Chart of Accounts,active
+UG-NGB,"NGO Board, Ministry of Internal Affairs (Uganda)",withdrawn
+UG-NGO,National Bureau for NGOs (Uganda),active
+UG-RSB,Registration Services Bureau,active
+UM-COA,United States Minor Outlying Islands (the) Chart of Accounts,active
+US-COA,United States of America (the) Chart of Accounts,active
+US-DOS,Corporation registration is the responsibility of each state (see link),withdrawn
+US-EIN,Employer Identification Number - Internal Revenue Service,active
+US-USAGOV,Index of U.S. Government Departments and Agencies,active
+UY-COA,Uruguay Chart of Accounts,active
+UZ-COA,Uzbekistan Chart of Accounts,active
+UZ-KTUT,United State Register of Corporate Entites,active
+VA-COA,Holy See (the) Chart of Accounts,active
+VC-COA,Saint Vincent and the Grenadines Chart of Accounts,active
+VE-COA,Venezuela (Bolivarian Republic of) Chart of Accounts,active
+VG-COA,Virgin Islands (British) Chart of Accounts,active
+VI-COA,Virgin Islands (U.S.) Chart of Accounts,active
+VN-COA,Viet Nam Chart of Accounts,active
+VN-MOST,Ministry of Science and Technology,active
+VU-COA,Vanuatu Chart of Accounts,active
+WF-COA,Wallis and Futuna Chart of Accounts,active
+WS-COA,Samoa Chart of Accounts,active
+XE-EXAMPLE,Example Data Prefix,active
+XI-BRIDGE,Basic Registry of Identified Global Entities,withdrawn
+XI-DUNS,D-U-N-S Number,active
+XI-EORI,Economic Operators Identification and Registration system,active
+XI-GRID,Global Research Identifiers Database,active
+XI-IATI,International Aid Transparency Initiative Organisation Identifier,active
+XI-LEI,Global Legal Entity Identifier Index,active
+XI-PB,Public Bodies - Open Knowledge Foundation ,active
+XI-PID,PermID: Thompson Reuters Permanent Identifier,active
+XI-ROR,Research Organization Registry,active
+XI-WIKIDATA,Wikidata,active
+XK-COA,Kosovo Chart of Accounts,active
+XM-DAC,OECD Development Assistance Committee,active
+XM-OCHA,United Nations Office for the Coordination of Humanitarian Affairs - Humanitarian Programme Cycle Identifiers,active
+XR-EUCB,European Union Corporate Bodies authority list,active
+XR-NUTS,NUTS - European Union Nomenclature of Territorial Units for Statistics,active
+YE-COA,Yemen Chart of Accounts,active
+YE-CR,"Commercial Registry, Yemen",active
+YE-MSAL,Ministry of Social Affairs and Labour,active
+YT-COA,Mayotte Chart of Accounts,active
+ZA-CIP,Companies and Intellectual Property Commission (CIPC),active
+ZA-CIT,South African Corporate Income Tax (CIT) number,active
+ZA-COA,South Africa Chart of Accounts,active
+ZA-NPO,Nonprofit Organisation Directorate - South African Department of Social Development,active
+ZA-PBO,SA Revenue Service Tax Exemption Unit ,withdrawn
+ZM-COA,Zambia Chart of Accounts,active
+ZM-PCR,Patents and Companies Registration Agency,active
+ZM-RNGO,Department of Registrar for NGOs,active
+ZW-COA,Zimbabwe Chart of Accounts,active
+ZW-PVO,Private Voluntary Organisations Council (Zimbabwe),active
+ZW-ROD,Registrar of Deeds,active
+ZZ-EBID,European Business Identifier (EBID),active

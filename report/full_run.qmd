@@ -1,0 +1,1349 @@
+---
+title: "IATI as network data: full run"
+subtitle: "Traceability of funding in IATI"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+    code-fold: true
+    code-summary: "R code"
+    fig-width: 8
+    fig-height: 4.5
+execute:
+  echo: true
+  warning: false
+  message: false
+params:
+  out_dir: "../outputs/bulk_2026-10-30"
+---
+
+```{r setup}
+# R may start in the "C" locale, which prints characters such as "→" as <U+2192>
+invisible(Sys.setlocale("LC_CTYPE", "en_US.UTF-8"))
+library(tidyverse)
+library(arrow)
+library(jsonlite)
+library(igraph)
+library(ggraph)
+library(knitr)
+
+out <- params$out_dir
+# na = "": only empty cells are missing. "NA" is Namibia's country code, and the
+# pipeline writes missing values as empty cells.
+rd  <- function(f) read_csv(file.path(out, f), show_col_types = FALSE, guess_max = 1e5, na = "")
+man <- fromJSON(file.path(out, "run_manifest.json"))
+rc  <- man$row_counts
+ind <- rd("indicators.csv") |> mutate(indicator = as.character(indicator))
+fmt <- function(x, d = 0) format(round(x, d), big.mark = ",", nsmall = d, trim = TRUE)
+
+# Colours: validated categorical slots 1-3 (identity of evidence); one hue for single series
+ev_col <- c(confirmed = "#2a78d6", `one-sided` = "#1baf7a", implausible = "#eb6834")
+one    <- "#2a78d6"
+theme_set(theme_minimal(base_size = 11) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank(),
+        plot.title.position = "plot", strip.text = element_text(face = "bold", hjust = 0)))
+g <- function(code, scope = "global", group = "All publishers")
+  filter(ind, indicator == code, scope == !!scope, group == !!group)
+```
+
+## Summary
+
+```{r summary-numbers}
+s4 <- fromJSON(file.path(out, "summaries", "04_network.json"))
+# The organisation counts below leave out UNICEF's partner codes (since November 2026)
+stopifnot("Rerun stage 4: its summary predates the partner-code rule" = !is.null(s4$org_network$partner_codes_left_out))
+```
+
+This report describes the full run of the traceability pipeline on the IATI Bulk Data Service copy whose index was created on `r substr(man$bulk_copy$index_created, 1, 10)`. It covers what each stage did to the data, the links between activities and between organisations, the chains of funding, and the indicators.
+
+- **Activities connected.** Of `r fmt(g("1")$denominator)` activities with transactions, `r fmt(g("1")$numerator)` (`r g("1")$percent`%) are connected to an activity of another organisation by a plausible link (indicator 1).
+- **Chain depth.** Funding can be followed activity by activity for a mean of `r g("6")$value` steps from each origin (indicator 6). The longest chain has `r g("6c")$value` steps.
+- **Organisation paths.** Counted by distinct sequences of organisations, `r g("6e")$percent`% of traceable routes have two or more steps (indicator 6e).
+- **Receiver IDs.** `r g("3")$percent`% of outgoing commitments and disbursements give a valid receiver organisation ID (indicator 3), against `r g("2")$percent`% of incoming transactions giving a valid provider ID (indicator 2).
+- **The gap.** Organisation IDs link `r fmt(s4$org_network$organisations)` organisations into an almost fully connected network (not counting `r fmt(s4$org_network$partner_codes_left_out)` codes that UNICEF gives its own partners). Followed activity by activity, the same funding falls apart into `r fmt(s4$activity_network$components)` separate pieces covering `r fmt(s4$activity_network$activities)` activities.
+
+Definitions and method decisions are in `docs/methods_decisions.md` and `docs/indicators.md`, and every column in `docs/data_dictionary.md`.
+
+## 1. Terms
+
+The counts in this report are in different units. They are not interchangeable.
+
+| Term | What it is | In the XML |
+|---|---|---|
+| **Activity** | A project or programme as published, with its own `iati-identifier`. It holds many transactions. | `<iati-activity>` |
+| **Transaction** | One financial flow in an activity: commitment, disbursement, expenditure, incoming funds. | `<transaction>` |
+| **Link** | A pair of activities (funder → receiver), connected because a transaction in one names the other's activity ID. One link usually rests on several transactions. | `provider-activity-id`, `receiver-activity-id` |
+| **Organisation link** | A pair of organisations, connected because a transaction names the other's organisation ID. | `provider-org ref`, `receiver-org ref` |
+| **Chain** | A sequence of links from an origin activity (no traced funder) to an end activity (no traced recipient). Length is in steps. | — |
+| **Organisation path** | The sequence of organisations along a chain. Many chains can share one. | — |
+
+```{r nesting}
+s3 <- fromJSON(file.path(out, "summaries", "03_links.json"))
+edges <- read_parquet(file.path(out, "activity_edges.parquet"))
+steps <- rd("chain_steps.csv")
+chain_edges <- distinct(steps, from_activity, to_activity) |> left_join(edges, by = c("from_activity", "to_activity"))
+tibble(
+  Level = c("All data after cleaning", "Transactions naming a published counterpart activity",
+            "Network: plausible links between different organisations", "Used in chains"),
+  Activities = c(rc$`2_clean`$activities, NA, s4$activity_network$activities,
+                 n_distinct(c(steps$from_activity, steps$to_activity))),
+  Links = c(NA, s3$activity_edges, s3$activity_edges_in_network, nrow(chain_edges)),
+  Transactions = c(rc$`2_clean`$transactions, s3$link_transactions,
+                   sum(edges$n_transactions[edges$in_network]), sum(chain_edges$n_transactions))
+) |> mutate(across(-Level, \(x) ifelse(is.na(x), "-", fmt(x)))) |>
+  kable(align = "lrrr", caption = "How the units nest")
+```
+
+## 2. The process
+
+```{r stages}
+r1 <- rc$`1_parse`; r2 <- rc$`2_clean`
+tribble(
+  ~Stage, ~Step, ~Activities, ~Transactions,
+  "1 Parse", "Read from all XML files", r1$activities_read, r1$transactions_read,
+  "1 Parse", "Unreadable files excluded", r1$activities_after_excluding_failed_files, r1$transactions_after_excluding_failed_files,
+  "2 Clean", "Activities without identifier removed", r1$activities_after_excluding_failed_files - r2$activities_without_identifier_removed, NA,
+  "2 Clean", "One copy per activity", r2$activities, r2$transactions,
+  "2 Clean", "Exact duplicate transactions flagged (left out of links and indicators)", NA, r2$transactions - r2$exact_duplicate_transactions_flagged
+) |> mutate(across(c(Activities, Transactions), \(x) ifelse(is.na(x), "", fmt(x)))) |>
+  kable(caption = "Row counts after each step")
+```
+
+```{r files}
+b <- man$bulk_copy
+tibble(Item = c("Datasets in the index", "Datasets missing from the copy", "XML files read",
+                "Organisation files (no transactions, skipped)", "Files that could not be read"),
+       Count = fmt(c(b$datasets_in_index, b$datasets_missing_from_copy, b$xml_files_read,
+                     b$files_skipped_organisation_files, b$files_failed))) |>
+  kable(caption = "Files in the bulk copy")
+```
+
+The stages and their settings are described in `README.md`. The pipeline ran in `r round(sum(unlist(man$seconds_per_stage)) / 60)` minutes. Package versions and every setting used are recorded in `run_manifest.json`.
+
+## 3. Links and their evidence
+
+```{r links-table}
+between <- filter(edges, !same_org)
+count(between, plausibility, evidence) |>
+  pivot_wider(names_from = evidence, values_from = n, values_fill = 0) |>
+  mutate(Total = rowSums(across(where(is.numeric)))) |>
+  arrange(desc(Total)) |> kable(caption = "Links between different organisations, by plausibility and evidence")
+```
+
+Of `r fmt(nrow(edges))` links, `r fmt(sum(edges$same_org))` (`r round(100 * mean(edges$same_org))`%) join two activities of the same organisation; these are not used in the network. Of the `r fmt(nrow(between))` links between organisations, `r fmt(sum(between$evidence == "confirmed"))` (`r round(100 * mean(between$evidence == "confirmed"), 1)`%) are reported by both sides.
+
+The plausibility rule is set out in `docs/methods_decisions.md`, section 3.1. Under it, `r fmt(sum(!between$plausible))` links are implausible, against `r fmt(sum(!between$plausible_strict))` under the strict rule.
+
+## 4. Chain depth in three units
+
+The same chains can be counted three ways, and they give different pictures:
+
+- **Per chain:** each path counts once.
+- **Per origin:** each starting activity counts once, by its longest chain. This is the pilot's indicator 6.
+- **Per organisation path:** each distinct sequence of organisations counts once.
+
+::: {.panel-tabset}
+
+### Figure
+
+```{r fig-depth, fig.height = 3.6}
+#| fig-cap: "Chain depth in three units: share of each unit by number of steps (global network)"
+dd <- rd("depth_distribution.csv") |> filter(origin_group == "All publishers") |>
+  mutate(unit = factor(unit, c("chains", "origins (longest chain)", "organisation paths"),
+                       c("Per chain", "Per origin (longest chain)", "Per organisation path")),
+         steps = factor(steps, c("1", "2", "3", "4+")))
+totals <- dd |> group_by(unit) |> summarise(n = sum(n))
+ggplot(dd, aes(steps, percent)) +
+  geom_col(fill = one, width = 0.7) +
+  geom_text(aes(label = paste0(percent, "%\n(", fmt(n), ")")), vjust = -0.2, size = 3, lineheight = 0.9) +
+  facet_wrap(~unit, labeller = labeller(unit = \(u) paste0(u, "  (n = ", fmt(totals$n[match(u, totals$unit)]), ")"))) +
+  scale_y_continuous(limits = c(0, 112), breaks = c(0, 50, 100), labels = \(x) paste0(x, "%")) +
+  labs(x = "Steps in the chain", y = NULL)
+```
+
+### Interactive
+
+```{r fig-depth-interactive}
+p <- ggplot(dd, aes(steps, percent, text = paste0(unit, "<br>", steps, " step(s): ", fmt(n), " (", percent, "%)"))) +
+  geom_col(fill = one, width = 0.7) + facet_wrap(~unit) + labs(x = "Steps in the chain", y = "Share (%)")
+plotly::ggplotly(p, tooltip = "text")
+```
+
+
+### Table
+
+```{r depth-table}
+dd |> select(unit, steps, n, percent) |>
+  pivot_wider(names_from = unit, values_from = c(n, percent), names_vary = "slowest") |>
+  kable(caption = "Table view of the figure above")
+```
+:::
+
+**Why they differ.** A few origins with many recipients dominate the count of chains. The 10 largest origins produce `r round(100 * sum(head(sort(rd("chain_origins.csv")$n_chains, decreasing = TRUE), 10)) / nrow(rd("chains.csv")))`% of all chains. Each of them repeats the same organisation path many times. Counted once per organisation path, `r g("6e")$percent`% of routes have two or more steps. The two diagrams below show the two extremes.
+
+```{r examples-load}
+ex <- fromJSON(file.path(out, "examples", "example_chains.json"), simplifyVector = FALSE)
+# Pick examples by their kind, not their position in the file
+by_kind <- \(k) Filter(\(e) e$kind == k, ex)[[1]]
+fan <- by_kind("One origin, many chains"); longest <- by_kind("Longest chain")
+# The origin with most chains, and the facts the fan-out caption states
+origins <- rd("chain_origins.csv")
+top <- slice_max(origins, n_chains, n = 1, with_ties = FALSE)
+top_chains <- filter(rd("chains.csv"), origin_activity == top$origin_activity)
+top_steps <- filter(steps, from_activity == top$origin_activity)
+fan_from <- top_steps$from_org_name[1]
+fan_to <- unique(top_steps$to_org_name)
+fan_n_draw <- min(40, nrow(top_steps))
+fan_cap <- paste0(
+  "One origin, many chains: one ", fan_from, " activity is named as funder by ",
+  fmt(n_distinct(top_steps$to_activity)), " activities",
+  if (length(fan_to) == 1) paste0(" of ", fan_to) else paste0(" of ", length(fan_to), " organisations"),
+  ". These are ", fmt(nrow(top_chains)), " chains (", fmt(sum(top_chains$steps == 1)), " of one step), but ",
+  fmt(n_distinct(top_chains$path_org_refs)), " organisation path(s). Only ", fan_n_draw,
+  " of the receiving activities are drawn."
+)
+longest_cap <- paste0("The longest chain (", length(longest$steps), " steps). Colour shows whether each link is confirmed by both sides.")
+```
+
+```{r fig-fanout, fig.height = 3.4}
+#| fig-cap: !expr fan_cap
+kids <- top_steps |> slice_head(n = fan_n_draw)
+gr <- graph_from_data_frame(transmute(kids, from = from_activity, to = to_activity, evidence))
+ggraph(gr, layout = "star", center = top$origin_activity) +
+  geom_edge_link(aes(colour = evidence), arrow = arrow(length = unit(1.5, "mm")), end_cap = circle(2, "mm"), width = 0.4) +
+  geom_node_point(aes(size = name == top$origin_activity), colour = "grey30", show.legend = FALSE) +
+  scale_size_manual(values = c(1.2, 4)) +
+  scale_edge_colour_manual(values = ev_col, name = "Link evidence") +
+  annotate("text", x = 0, y = -1.22, size = 3,
+           label = paste0("Origin: ", top$origin_activity, " (", fan_from, "), ", fmt(top$n_chains), " chains",
+                          if (length(fan_to) == 1) paste0(", all to ", fan_to, " activities") else "")) +
+  coord_fixed(clip = "off") + theme_void() + theme(plot.margin = margin(5, 5, 20, 5))
+```
+
+```{r fig-longest, fig.height = 1.9, fig.width = 9}
+#| fig-cap: !expr longest_cap
+chain_row <- function(e) {
+  st <- map_dfr(e$steps, \(s) tibble(step = s$step, from = s$from_org, to = s$to_org, evidence = s$evidence))
+  nodes <- tibble(x = 0:nrow(st), name = c(st$from[1], st$to))
+  ggplot() +
+    geom_segment(data = st, aes(x = step - 1 + 0.12, xend = step - 0.12, y = 0, yend = 0, colour = evidence),
+                 linewidth = 1.2, arrow = arrow(length = unit(2, "mm"))) +
+    geom_point(data = nodes, aes(x, 0), size = 3.5, colour = "grey30") +
+    geom_text(data = nodes, aes(x, -0.08, label = str_wrap(name, 16)), vjust = 1, size = 2.7, lineheight = 0.9) +
+    scale_colour_manual(values = ev_col, name = "Link evidence") +
+    scale_x_continuous(limits = c(-0.6, nrow(st) + 0.6)) +
+    scale_y_continuous(limits = c(-0.32, 0.05)) + theme_void() + theme(legend.position = "top")
+}
+chain_row(longest)
+```
+
+```{r fig-depth-group, fig.height = 4}
+#| fig-cap: "Share with 2+ steps, by unit and the publisher group of the chain's origin. Groups with fewer than 30 origins are left out."
+dg <- rd("depth_distribution.csv") |> group_by(unit, origin_group) |>
+  summarise(multi = sum(n[steps != "1"]), n = sum(n), .groups = "drop") |>
+  mutate(share = 100 * multi / n)
+keep <- dg |> filter(unit == "origins (longest chain)", n >= 30) |> pull(origin_group)
+dg |> filter(origin_group %in% keep, n > 0) |>
+  mutate(unit = factor(unit, c("chains", "origins (longest chain)", "organisation paths"),
+                       c("Per chain", "Per origin", "Per organisation path")),
+         origin_group = fct_relevel(fct_reorder(origin_group, share, .fun = max, .na_rm = TRUE),
+                                    "All publishers", after = Inf)) |>
+  ggplot(aes(share, origin_group)) +
+  geom_col(fill = one, width = 0.65) +
+  geom_text(aes(label = paste0(round(share), "%")), hjust = -0.15, size = 2.8) +
+  geom_hline(yintercept = length(keep) - 0.5, colour = "grey60", linewidth = 0.3) +
+  facet_wrap(~unit) + scale_x_continuous(limits = c(0, 75), breaks = c(0, 25, 50), labels = \(x) paste0(x, "%")) +
+  labs(x = "Share with 2+ steps", y = NULL) +
+  theme(panel.grid.major.y = element_blank(), panel.spacing.x = unit(1.5, "lines"))
+```
+
+### Explore organisation paths and chains
+
+Every organisation path (`org_paths.csv`), and every chain of two or more steps (`chains.csv`), with search and column filters. For example, type an organisation name into the search box to see every traceable route through it.
+
+::: {.panel-tabset}
+
+#### Organisation paths
+
+```{r paths-dt}
+rd("org_paths.csv") |>
+  transmute(path = path_orgs, steps, chains = n_chains, `best evidence` = best_evidence, countries,
+            years = if_else(first_year == last_year, as.character(first_year), paste0(first_year, "-", last_year)),
+            `origin group` = origin_publisher_group) |>
+  DT::datatable(filter = "top", rownames = FALSE,
+                options = list(pageLength = 10, scrollX = TRUE, autoWidth = TRUE,
+                               columnDefs = list(list(width = "40%", targets = 0))))
+```
+
+#### Chains of 2+ steps
+
+```{r chains-dt}
+rd("chains.csv") |> filter(steps >= 2) |>
+  transmute(path = path_orgs, activities = path_activities, steps, `weakest evidence` = weakest_evidence,
+            countries, years, `why it stops` = end_reason) |>
+  DT::datatable(filter = "top", rownames = FALSE,
+                options = list(pageLength = 10, scrollX = TRUE, autoWidth = TRUE,
+                               columnDefs = list(list(width = "40%", targets = 0))))
+```
+
+:::
+
+## 5. Where chains stop
+
+For each activity that receives funds but has no onward link in the network, the reason records the best evidence its outgoing transactions give about where the money went.
+
+::: {.panel-tabset}
+
+### Figure
+
+```{r fig-ends, fig.height = 4}
+#| fig-cap: "Why chains stop: chain ends inside the network, and all activities that receive funds"
+ends <- rd("chain_end_reasons.csv") |>
+  mutate(end_reason = factor(end_reason, rev(unique(end_reason))),
+         scope = factor(scope, c("chain ends (in network)", "all receiving activities"),
+                        c("Chain ends in the network", "All receiving activities")))
+ggplot(ends, aes(percent, end_reason)) +
+  geom_col(fill = one, width = 0.65) +
+  geom_text(aes(label = paste0(percent, "% (", fmt(activities), ")")), hjust = -0.1, size = 2.7) +
+  facet_wrap(~scope) + scale_x_continuous(limits = c(0, 75), labels = \(x) paste0(x, "%")) +
+  labs(x = "Share of activities", y = NULL) + theme(panel.grid.major.y = element_blank())
+```
+
+### Interactive
+
+```{r fig-ends-interactive}
+p <- ggplot(ends, aes(percent, end_reason,
+                      text = paste0(end_reason, "<br>", fmt(activities), " activities (", percent, "%)"))) +
+  geom_col(fill = one, width = 0.65) + facet_wrap(~scope) + labs(x = "Share of activities (%)", y = NULL)
+plotly::ggplotly(p, tooltip = "text")
+```
+
+:::
+
+## 6. Organisation network and activity network
+
+```{r networks-table}
+tibble(
+  ` ` = c("Nodes", "Links", "Separate pieces (components)", "Largest piece"),
+  `Organisation network` = fmt(c(s4$org_network$organisations, s4$org_network$edges,
+                                 s4$org_network$components, s4$org_network$largest_components[[1]])),
+  `Activity network` = fmt(c(s4$activity_network$activities, s4$activity_network$edges,
+                             s4$activity_network$components, s4$activity_network$largest_components[[1]])),
+  `Activity network seen as organisations` = c(fmt(s4$activity_network_projected_to_orgs$organisations),
+                                               fmt(s4$activity_network_projected_to_orgs$edges), "", "")
+) |> kable(caption = "Organisation IDs connect almost everyone; activity IDs connect few")
+```
+
+Organisation IDs place `r round(100 * s4$org_network$largest_components[[1]] / s4$org_network$organisations, 1)`% of organisations in one connected network. Only `r fmt(s4$org_network$org_edges_also_traced_by_activity_link)` of `r fmt(s4$org_network$edges)` organisation links (`r round(100 * s4$org_network$org_edges_also_traced_by_activity_link / s4$org_network$edges, 1)`%) can also be followed through activity IDs. The organisation network leaves out `r fmt(s4$org_network$partner_codes_left_out)` identifiers that UNICEF gives its own partners (`XM-DAC-41122-VN-…`, `config.PARTNER_CODE_PATTERN`) and their `r fmt(s4$org_network$edges_with_partner_codes_left_out)` links. They publish no activities, so the activity network does not change. The figure shows that traceable part: organisations joined by at least one activity link.
+
+```{r orgnet-build}
+oe <- read_parquet(file.path(out, "org_edges.parquet")) |> filter(has_activity_link) |>
+  transmute(from = from_org, to = to_org,
+            evidence = if_else(n_activity_links_confirmed > 0, "confirmed", "one-sided"))
+on <- read_parquet(file.path(out, "org_nodes.parquet")) |> filter(org_ref %in% c(oe$from, oe$to))
+og_all <- graph_from_data_frame(oe, vertices = select(on, org_ref, org_type))
+comp <- components(og_all, mode = "weak")
+og <- induced_subgraph(og_all, which(comp$membership == which.max(comp$csize)))
+orgnet_cap <- paste0("Organisations joined by activity links (the activity network seen as organisations): the largest connected group, ", fmt(vcount(og)), " of ", fmt(vcount(og_all)), " organisations; the other ", fmt(vcount(og_all) - vcount(og)), " sit in ", comp$no - 1, " small separate groups. Links are coloured by whether at least one activity link between the two organisations is confirmed by both sides.")
+```
+
+::: {.panel-tabset}
+
+### Figure
+
+```{r fig-orgnet, fig.height = 6.5}
+#| fig-cap: !expr orgnet_cap
+set.seed(6)
+ggraph(og, layout = "fr") +
+  geom_edge_link(aes(colour = evidence), alpha = 0.5, width = 0.3) +
+  geom_node_point(size = 0.6, colour = "grey30") +
+  scale_edge_colour_manual(values = ev_col[1:2], name = "Activity links") +
+  theme_void() + theme(legend.position = "top")
+```
+
+### Interactive
+
+Zoom with the scroll wheel, drag to move. Hover over an organisation to see its name, type and identifier, or select one from the list to highlight its links.
+
+```{r orgnet-interactive}
+library(visNetwork)
+deg <- degree(og)
+vn_nodes <- tibble(id = V(og)$name) |>
+  left_join(select(on, org_ref, org_name, org_type), by = c("id" = "org_ref")) |>
+  mutate(label = "", value = deg[id], color = "#555555",
+         title = paste0("<b>", coalesce(org_name, id), "</b><br>", coalesce(org_type, "type unknown"),
+                        "<br>", id, "<br>", deg[id], " linked organisation(s)"))
+vn_edges <- igraph::as_data_frame(og, what = "edges") |>
+  mutate(color = unname(ev_col[evidence]), title = evidence)
+visNetwork(vn_nodes, vn_edges, width = "100%", height = "650px") |>
+  visIgraphLayout(layout = "layout_with_fr", randomSeed = 6) |>
+  visNodes(scaling = list(min = 4, max = 25)) |>
+  visEdges(smooth = FALSE, width = 0.6) |>
+  visOptions(highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),
+             nodesIdSelection = list(enabled = TRUE, main = "Select an organisation (by ID)"))
+```
+
+:::
+
+## 7. Indicators
+
+Indicator definitions, numerators, denominators and units are in `docs/indicators.md`. Rows with a denominator below 30 are flagged `small_base` in `indicators.csv`; their percentages should not be reported.
+
+```{r indicators-table}
+ind |> filter(group == "All publishers", scope %in% c("global", "all_2023", "all_2024", "all_2025")) |>
+  mutate(result = if_else(is.na(value), paste0(fmt(percent, 1), "%"), as.character(value)), # one decimal: "7.0%", not "7%"
+         scope = recode(scope, global = "Global", all_2023 = "2023", all_2024 = "2024", all_2025 = "2025")) |>
+  select(indicator, name, unit, scope, result) |>
+  pivot_wider(names_from = scope, values_from = result) |>
+  kable(caption = "Indicators, all publishers. Years by transaction date; the network is global.")
+```
+
+```{r indicators-group}
+key <- c("1", "2", "3", "4", "5", "x1")
+ind |> filter(scope == "global", indicator %in% key, group != "All publishers") |>
+  mutate(cell = if_else(small_base, paste0("(n=", denominator, ")"), paste0(percent))) |>
+  select(group, indicator, cell) |> pivot_wider(names_from = indicator, values_from = cell) |>
+  left_join(ind |> filter(scope == "global", indicator == "1") |> select(group, activities = denominator), by = "group") |>
+  arrange(desc(activities)) |> mutate(activities = fmt(activities)) |>
+  kable(caption = "Key indicators (%) by publisher group, global. Small bases are shown as (n = denominator).")
+```
+
+**Sensitivity to the open questions.** Each setting was switched in turn and stage 5 rerun (`report/sensitivity.py`; results in `sensitivity.csv`).
+
+**Disbursements only.** By default, outgoing flows pool commitments and disbursements (types 2 and 3), and incoming flows pool incoming funds and incoming commitments (types 1 and 11). The McCarthy paper uses disbursements only. In this alternative, outgoing flows are disbursements (type 3) and incoming flows are incoming funds (type 1). Because this changes which links exist, the links, the network and the chains were rebuilt (stages 3–5, in `sensitivity_disbursements_only/`), so indicators 1 and 6 change too.
+
+```{r sensitivity}
+rd("sensitivity.csv") |> mutate(indicator = as.character(indicator)) |>
+  filter(scope %in% c("global", "all_2025")) |>
+  mutate(scope = recode(scope, global = "Global", all_2025 = "2025")) |>
+  select(setting, scope, indicator, result) |>
+  pivot_wider(names_from = indicator, values_from = result) |>
+  select(setting, scope, `1`, `2`, `3`, `4`, `5`, x1, x1b, `6`) |>
+  kable(caption = "Main indicators (% ; indicator 6 in steps) under each alternative setting. Each row changes one setting from the default. Units: 1 activities; 2 to 5, x1 and x1b transactions; 6 origins.")
+```
+
+**Explore all indicators.** Every row of `indicators.csv`, with search and column filters.
+
+```{r indicators-dt}
+ind |> select(scope, group, indicator, name, unit, numerator, denominator, percent, value, small_base) |>
+  DT::datatable(filter = "top", rownames = FALSE, options = list(pageLength = 15, scrollX = TRUE))
+```
+
+## 8. Five example chains, with the XML behind each step
+
+```{r xml-examples, results = "asis"}
+for (k in seq_along(ex)) {
+  e <- ex[[k]]
+  cat("\n### ", k, ". ", e$kind, "\n\n", e$why_chosen, "\n\n", sep = "")
+  if (!is.null(e$chain$path_orgs)) cat("**Path:** ", e$chain$path_orgs, "\n\n", sep = "")
+  for (s in e$steps) {
+    cat("**Step ", s$step, ":** ", s$from_org, " → ", s$to_org, " (", s$evidence, "; ", s$plausibility, ")\n\n", sep = "")
+    for (side in names(s$sides)) {
+      d <- s$sides[[side]]; x <- d$xml[[1]]
+      cat("Reported by the ", if (side == "provider") "funder" else "receiver", " in ", d$n_transactions,
+          " transaction(s). First one, `", x$file, "` line ", x$line, ":\n\n```xml\n", x$xml, "\n```\n\n", sep = "")
+    }
+  }
+  if (!is.null(e$end)) {
+    cat("**Where the chain stops:** ", e$end$reason, ".\n\n", sep = "")
+    for (x in e$end$xml[1]) cat("`", x$file, "` line ", x$line, ":\n\n```xml\n", x$xml, "\n```\n\n", sep = "")
+  }
+  if (!is.null(e$note)) cat(e$note, "\n\n")
+}
+```
+
+All transactions shown per step, up to two per side, are in `examples/example_chains.md`.
+
+## 9. Traceability by recipient country
+
+```{r spatial-setup}
+library(sf)
+library(rnaturalearth)
+library(patchwork)
+library(ggrepel)
+
+rd_codes <- rd # kept for chunks that use the old name; rd() already reads "NA" as Namibia
+ci <- rd_codes("country_indicators.csv")
+stopifnot("NA" %in% ci$country)
+s6 <-fromJSON(file.path(out, "summaries", "06_spatial.json"))
+rule_used <- s6$multi_country_rule
+ee <- "EPSG:8857" # Equal Earth: an equal-area projection, so Africa keeps its true size
+world <- ne_countries(scale = "medium", returnclass = "sf") |>
+  filter(continent != "Antarctica") |>
+  mutate(iso2 = if_else(iso_a2_eh == "-99", iso_a2, iso_a2_eh)) |>
+  select(iso2, name_long) |>
+  st_transform(ee)
+
+# Shares in six classes (viridis, colour-blind safe); small bases and missing countries in grey
+bins <- list(`1` = c(0, 0.5, 1, 2, 4, 8, 100), `3` = c(0, 10, 20, 30, 40, 60, 100))
+na_cols <- c("Base below 30" = "grey70", "No activities placed" = "grey90")
+ind_title <- c(`1` = "Indicator 1: activities connected to another IATI activity (unit: activities)",
+               `3` = "Indicator 3: outgoing transactions with a valid receiver ID (unit: transactions)")
+
+map_data_for <- function(d, code) {
+  b <- bins[[as.character(code)]]
+  # Plain-text labels ("0 to 0.5%"), readable whatever the R locale
+  lab <-paste0(head(b, -1), " to ", tail(b, -1), "%")
+  world |>
+    left_join(filter(d, indicator == code), by = c("iso2" = "country")) |>
+    mutate(cls = case_when(is.na(denominator) ~ "No activities placed",
+                           small_base ~ "Base below 30",
+                           TRUE ~ as.character(cut(percent, b, labels = lab, include.lowest = TRUE, right = FALSE))),
+           cls = factor(cls, c(lab, names(na_cols))))
+}
+map_cols <- function(m) c(setNames(viridisLite::viridis(6, direction = -1), head(levels(m$cls), 6)), na_cols)
+map_one <- function(d, code) {
+  m <- map_data_for(d, code)
+  ggplot(m) +
+    geom_sf(aes(fill = cls), colour = "white", linewidth = 0.08) +
+    scale_fill_manual(values = map_cols(m), drop = FALSE, name = NULL) +
+    coord_sf(crs = ee, datum = NA) +
+    labs(title = ind_title[[as.character(code)]]) +
+    theme_void(base_size = 10) +
+    theme(legend.position = "bottom", plot.title = element_text(face = "bold", size = 10)) +
+    guides(fill = guide_legend(nrow = 1, label.position = "bottom",
+                               keywidth = unit(1.2, "cm"), keyheight = unit(0.3, "cm")))
+}
+cg   <- filter(ci, scope == "global", default_rule)
+c25  <- filter(ci, scope == "all_2025", default_rule)
+cnt  <- function(code, what) sum(cg$indicator == code & (what == "all" | !cg$small_base))
+off_map <- cg |> filter(!country %in% world$iso2)
+```
+
+Indicators 1 and 3 can be computed for each recipient country, on the same definitions as in section 7 and on the global network. A link to an activity in another country still counts. Countries are taken from the activity, or from its transactions if the activity names none. Under the rule used here (`r rule_used`), an activity or transaction that names several countries counts in each of them. Indicator 1 can be computed for `r cnt(1, "all")` countries, `r cnt(1, "base")` of them with 30 or more activities. Indicator 3 can be computed for `r cnt(3, "all")` countries, `r cnt(3, "base")` of them with 30 or more transactions. Countries with a smaller base are grey. Rules and their effect on the counts are in `docs/methods_decisions.md`, section 7.
+
+Donor countries also appear as recipients, through their domestic programmes and multi-country activities. Their shares are therefore not comparable with those of partner countries.
+
+### Method: how activities and transactions are placed in countries
+
+```{r spatial-method}
+acts_c <- read_parquet(file.path(out, "activities_clean.parquet"),
+                       col_select = c(iati_identifier, reporting_org_name, title,
+                                      recipient_countries, recipient_country_percentages)) |>
+  mutate(k = str_count(recipient_countries, ";") + 1)
+n_multi     <- sum(acts_c$k >= 2, na.rm = TRUE)
+# Percentages count as given only if the field holds at least one value (it can be ";;")
+n_multi_pct <- sum(acts_c$k >= 2 &
+                   str_remove_all(coalesce(acts_c$recipient_country_percentages, ""), "[; ]") != "", na.rm = TRUE)
+src <- s6$activities_by_country_source
+pct1 <- \(x) sprintf("%.1f", x)
+med <- ci |> filter(scope == "global", !small_base) |>
+  group_by(indicator, rule) |> summarise(m = median(percent), n = n(), .groups = "drop")
+md  <- \(code, r) pct1(med$m[med$indicator == code & med$rule == r])
+ug  <- \(code, r) ci |> filter(scope == "global", country == "UG", rule == r, indicator == code) |> pull(percent) |> pct1()
+# Transactions that name a country outside their own activity's list (unit: transactions;
+# exact duplicates left out; only activities that name countries themselves)
+tx_c <- open_dataset(file.path(out, "transactions_clean.parquet")) |>
+  filter(!is.na(tx_recipient_countries), !exact_duplicate) |>
+  select(iati_identifier, tx_recipient_countries) |> collect() |>
+  inner_join(filter(acts_c, !is.na(recipient_countries)) |> select(iati_identifier, recipient_countries),
+             by = "iati_identifier") |>
+  mutate(outside = map2_lgl(str_split(tx_recipient_countries, ";"), str_split(recipient_countries, ";"),
+                            \(t, a) any(!t %in% a)))
+n_tx_outside  <- sum(tx_c$outside)
+n_act_outside <- n_distinct(tx_c$iati_identifier[tx_c$outside])
+```
+
+The country maps need each activity and each transaction to be given one or more countries. This is done in stage 6 (`06_spatial.py`) in three steps.
+
+**Step 1: which countries.** IATI gives recipient countries at two levels: on the activity (`<recipient-country>` in `<iati-activity>`) and, less often, on single transactions. The rule is:
+
+- An **activity** is placed in the countries it names itself. If it names none, it is placed in all the countries named on its transactions in the scope. Of the `r fmt(nrow(acts_c))` activities, `r fmt(src$activity)` are placed by their own countries, `r fmt(src$transactions)` by their transactions' countries only, and `r fmt(src$none)` cannot be placed (including activities with no transactions).
+- A **transaction** is placed in its activity's countries. Only if the activity names none is the transaction's own country used. The two rarely conflict: `r fmt(n_tx_outside)` of the `r fmt(nrow(tx_c))` transactions that give a country inside an activity that also gives one name a country that their activity does not list (unit: transactions; in `r fmt(n_act_outside)` activities).
+
+This is the same rule that stage 5 uses for its country subsets (`common.transaction_countries()`). A country's indicator 1 and 3 values under the rule "every" are therefore identical to the stage 5 values for that country (checked for Uganda 2025).
+
+**Step 2: which codes are countries.** Only two-letter codes are placed on the map. The country field sometimes holds other codes, such as `GLOBAL`, region numbers (`998`) or three-letter codes (`HTI`). These are left out of the country lists and counted in the tab "Not on the map". Activities that give only a region, such as `298` "Africa, regional", are also listed there and not drawn.
+
+**Step 3: activities and transactions that name several countries.** `r fmt(n_multi)` activities name two or more countries; `r fmt(n_multi_pct)` of them give a percentage for each country. Such an activity cannot be put in one country without a rule. Stage 6 computes the indicators under three rules. The maps show the rule set in `config.MULTI_COUNTRY_RULE` (now "`r rule_used`"); the tab "Multi-country rule" compares all three.
+
+| Rule | What it does | Effect on a country's numerator and denominator |
+|---|---|---|
+| **every** | The activity (or transaction) counts **in full in every country it lists**. An activity in Kenya, Uganda and Ethiopia counts as one activity in each of the three. | Whole numbers. An activity is counted several times across countries, so country denominators add up to more than the number of activities. |
+| **single** | **Only activities (or transactions) that name exactly one country are counted.** Multi-country activities are left out of every country. | Whole numbers. Smaller denominators; multi-country programmes disappear from the map. |
+| **split** | The activity (or transaction) is **divided between its countries by the published percentages**. With 46% Kenya, it counts as 0.46 of an activity in Kenya. If the percentages are missing, or do not match the list of countries, or are not numbers, it is divided equally. | Fractions (for example 3.6 activities). Each activity adds up to exactly 1 across countries, so country denominators add up to the number of placed activities. |
+
+**A worked example.** The activity below names three countries with percentages. It is connected (it receives funds from a Danida activity through a network link), so it counts in the numerator and the denominator of indicator 1.
+
+```{r spatial-method-example}
+#| results: asis
+ex_id <-"DK-CVR-58185728-XM-DAC-3-1-271181-32556"
+ex_act <- filter(acts_c, iati_identifier == ex_id) # not "ex": that name holds the example chains
+net_acts <- with(filter(edges, in_network), c(from_activity, to_activity))
+# The text around this chunk describes this activity; stop if a new run changes it
+stopifnot(nrow(ex_act) == 1, ex_id %in% net_acts, ex_act$recipient_countries == "KE;UG;ET")
+if (nrow(ex_act) == 1) {
+  cc <- str_split_1(ex_act$recipient_countries, ";")
+  pc <- as.numeric(str_split_1(ex_act$recipient_country_percentages, ";"))
+  cat("**", ex_act$reporting_org_name, "**, *", ex_act$title, "* (`", ex_id, "`): ",
+      paste0(cc, " ", pc, "%", collapse = ", "), ".\n\n", sep = "")
+  tibble(Country = cc, `Published percentage` = paste0(pc, "%"),
+         every = 1, single = 0, split = sprintf("%.2f", pc / sum(pc))) |>
+    kable(caption = "What this one activity adds to each country's indicator 1 numerator and denominator (unit: activities), under each rule.") |>
+    print()
+}
+```
+
+A transaction is treated in the same way, with its activity's countries and percentages. A commitment of this activity would count as one transaction in each of Kenya, Uganda and Ethiopia under "every"; it would be left out under "single"; and it would count as 0.46, 0.34 and 0.20 of a transaction under "split".
+
+**What the choice changes.** For most partner countries the three rules give similar shares. Uganda's indicator 1 is `r ug(1, "every")`% under "every", `r ug(1, "single")`% under "single" and `r ug(1, "split")`% under "split". Across countries with 30 or more activities, the median of indicator 1 is `r md(1, "every")`% under "every", against `r md(1, "single")`% under "single" and `r md(1, "split")`% under "split". The median of indicator 3 is `r md(3, "every")`%, `r md(3, "single")`% and `r md(3, "split")`%. The rules differ most for donor countries that are listed, often with a small percentage, in large multi-country activities. Under "every" these activities count in full in the donor country.
+
+**Why "every" is used for now.** It matches stage 5's country subsets, it keeps the counts as whole numbers, and it does not depend on percentages that publishers often omit or fill in loosely. Its drawback is that a multi-country programme carries the same weight in a country it barely touches as in its main country. "Split" corrects this, but it depends on the published percentages. The choice is open (`docs/methods_decisions.md`, section 7).
+
+**Small bases.** A country is grey ("Base below 30") when fewer than 30 activities (indicator 1) or transactions (indicator 3) are placed in it under the rule shown. A share on such a base can change by several points with one activity. Under "split", the base is the sum of the shares, so it can be a fraction. The column `records` in `country_indicators.csv` gives the number of activities or transactions behind each denominator, each counted once.
+
+::: {.panel-tabset}
+
+### Maps
+
+**Reading the legend.** Each colour is a class of shares. A class includes its lower limit and excludes its upper limit. For example, "1 to 2%" holds shares from 1.0% up to but not including 2.0%, so a country at exactly 2.0% is in "2 to 4%". The top class includes 100%. The classes differ between the two indicators because their shares differ in size: indicator 1 is below 5% in most countries, so its classes double in width (0.5, 1, 2, 4, 8%); indicator 3 is mostly between 10% and 40%, so its classes are 10 points wide. Two grey classes are not shares: "Base below 30" means fewer than 30 activities (indicator 1) or transactions (indicator 3) are placed in the country, too few for a share; "No activities placed" means none are.
+
+```{r fig-map-a, fig.height = 9, fig.width = 8.5}
+#| fig-cap: "Traceability by recipient country, all years. Equal Earth projection. Grey: denominator below 30, or nothing placed in the country."
+map_one(cg, 1) / map_one(cg, 3)
+```
+
+### Share and base
+
+Each point is a country with 30 or more activities (indicator 1) or transactions (indicator 3). Shares on small bases vary more, so the countries at the extremes are often small.
+
+```{r fig-map-a-base, fig.height = 4}
+#| fig-cap: "Share against denominator, by recipient country, all years. Labelled: the 10 largest bases and the 4 highest shares in each panel."
+sc <- cg |> filter(!small_base) |>
+  mutate(ind = if_else(indicator == 1, "Indicator 1 (unit: activities)", "Indicator 3 (unit: transactions)")) |>
+  group_by(ind) |>
+  mutate(lbl = if_else(rank(-denominator) <= 10 | rank(-percent) <= 4, country, NA)) |>
+  ungroup()
+ggplot(sc, aes(denominator, percent)) +
+  geom_point(colour = one, alpha = 0.6, size = 1.4) +
+  geom_text_repel(aes(label = lbl), size = 2.7, na.rm = TRUE, min.segment.length = 0, seed = 1) +
+  facet_wrap(~ind, scales = "free_y") +
+  scale_x_log10(labels = scales::label_comma()) +
+  scale_y_continuous(labels = \(x) paste0(x, "%")) +
+  labs(x = "Denominator, log scale (activities or outgoing transactions placed in the country)", y = "Share") +
+  theme(panel.grid.major.x = element_line(colour = "grey92"))
+```
+
+### 2025
+
+```{r fig-map-a-2025, fig.height = 9, fig.width = 8.5}
+#| fig-cap: "Traceability by recipient country, transactions dated 2025. Equal Earth projection."
+map_one(c25, 1) / map_one(c25, 3)
+```
+
+### Interactive
+
+Hover over a country for numerator / denominator (share) under each multi-country rule. Colours are those of the static maps; zoom with the mouse.
+
+```{r fig-map-a-interactive}
+#| fig-height: 9
+#| fig-cap: "Traceability by recipient country, all years, interactive. Colour classes as in the static maps."
+# Coarser borders than the static maps, to keep the HTML file small
+world_small <- ne_countries(scale = "small", returnclass = "sf") |>
+  filter(continent != "Antarctica") |>
+  mutate(iso2 = if_else(iso_a2_eh == "-99", iso_a2, iso_a2_eh)) |>
+  select(iso2, name_long) |>
+  st_transform(ee)
+tip <- ci |>
+  filter(scope == "global") |>
+  mutate(txt = paste0(rule, ": ", fmt(numerator, 1), " / ", fmt(denominator, 1), " (", percent, "%)")) |>
+  group_by(country, indicator) |>
+  summarise(rules = paste(txt, collapse = "<br>"), .groups = "drop")
+map_interactive <- function(code) {
+  m <- map_data_for(cg, code)
+  m <- world_small |>
+    left_join(st_drop_geometry(m) |> distinct(iso2, .keep_all = TRUE) |> select(-name_long), by = "iso2") |>
+    mutate(cls = replace_na(as.character(cls), "No activities placed") |> factor(levels(m$cls))) |>
+    left_join(filter(tip, indicator == code), by = c("iso2" = "country")) |>
+    mutate(text = paste0("<b>", name_long, "</b> (", iso2, ")<br>", ind_title[[as.character(code)]], "<br>",
+                         if_else(is.na(rules), "nothing placed", rules)))
+  plotly::plot_ly(m, split = ~iso2, color = ~cls, colors = map_cols(m), text = ~text, alpha = 1,
+                  hoverinfo = "text", hoveron = "fills", stroke = I("white"), span = I(0.3),
+                  showlegend = FALSE)
+}
+noaxis <- list(visible = FALSE)
+pm <- plotly::subplot(map_interactive(1), map_interactive(3), nrows = 2, margin = 0.02) |>
+  plotly::plotly_build()
+# plot_ly draws map fills at 50% opacity; use full colour, as in the static maps
+pm$x$data <- lapply(pm$x$data, \(tr) { tr$fillcolor <- sub(",0\\.5\\)$", ",1)", tr$fillcolor); tr })
+pm$height <- 900
+pm |>
+  plotly::layout(xaxis = noaxis, yaxis = c(noaxis, scaleanchor = "x"),
+                 xaxis2 = noaxis, yaxis2 = c(noaxis, scaleanchor = "x2"),
+                 annotations = list(
+                   list(text = "Indicator 1 (activities)", x = 0, y = 1, xref = "paper", yref = "paper",
+                        showarrow = FALSE, xanchor = "left", font = list(size = 13)),
+                   list(text = "Indicator 3 (transactions)", x = 0, y = 0.49, xref = "paper", yref = "paper",
+                        showarrow = FALSE, xanchor = "left", font = list(size = 13))))
+```
+
+### Multi-country rule
+
+Each point is a country with 30 or more activities or transactions under every rule. Points on the diagonal are not affected by the choice. Under "every", an activity naming several countries counts in full in each. Under "split", it is divided by its published percentages.
+
+```{r fig-map-a-rules, fig.height = 4}
+#| fig-cap: "Share by recipient country under two multi-country rules, all years. Labelled: the 8 largest differences in each panel."
+rw <- ci |>
+  filter(scope == "global") |>
+  group_by(country, indicator) |>
+  filter(all(!small_base), n() == 3) |>
+  ungroup() |>
+  select(country, indicator, rule, percent) |>
+  pivot_wider(names_from = rule, values_from = percent) |>
+  mutate(ind = if_else(indicator == 1, "Indicator 1 (unit: activities)", "Indicator 3 (unit: transactions)")) |>
+  group_by(ind) |>
+  mutate(lbl = if_else(rank(-abs(every - split)) <= 8, country, NA)) |>
+  ungroup()
+ggplot(rw, aes(split, every)) +
+  geom_abline(colour = "grey60", linetype = 2) +
+  geom_point(colour = one, alpha = 0.6, size = 1.4) +
+  geom_text_repel(aes(label = lbl), size = 2.7, na.rm = TRUE, min.segment.length = 0, seed = 1) +
+  facet_wrap(~ind, scales = "free") +
+  scale_x_continuous(labels = \(x) paste0(x, "%")) +
+  scale_y_continuous(labels = \(x) paste0(x, "%")) +
+  labs(x = "Split by percentages", y = "Counted in every country")
+```
+
+```{r map-a-rules-table}
+ci |>
+  filter(scope == "global") |>
+  group_by(indicator, unit, rule) |>
+  summarise(countries = n(), `base 30+` = sum(!small_base),
+            `median share, base 30+ (%)` = median(percent[!small_base]), .groups = "drop") |>
+  kable(caption = "Effect of the multi-country rule, all years.")
+```
+
+### Not on the map
+
+```{r map-a-unplaced}
+region_names <- c(`89` = "Europe, regional", `189` = "North of Sahara, regional", `289` = "South of Sahara, regional",
+                  `298` = "Africa, regional", `380` = "West Indies, regional", `389` = "North & Central America, regional",
+                  `489` = "South America, regional", `498` = "America, regional", `589` = "Middle East, regional",
+                  `619` = "Central Asia, regional", `679` = "South Asia, regional", `689` = "South & Central Asia, regional",
+                  `789` = "Far East Asia, regional", `798` = "Asia, regional", `889` = "Oceania, regional",
+                  `998` = "Developing countries, unspecified")
+un <- rd_codes("spatial_unplaced.csv") |> filter(scope == "global") |> mutate(code = as.character(code))
+un |>
+  group_by(reason) |>
+  summarise(`activities (rows)` = sum(activities), `connected` = sum(activities_connected),
+            `outgoing transactions` = sum(outgoing_transactions), .groups = "drop") |>
+  mutate(across(-reason, fmt)) |>
+  kable(caption = "Activities with transactions that cannot be placed in a country, all years. An activity naming several regions is counted once per region.")
+un |>
+  filter(reason == "region only") |>
+  slice_max(activities, n = 10) |>
+  mutate(name = coalesce(region_names[code], ""), share_connected = round(100 * activities_connected / activities, 1)) |>
+  select(code, name, activities, connected = activities_connected, `connected (%)` = share_connected) |>
+  mutate(across(c(activities, connected), fmt)) |>
+  kable(caption = "The 10 region codes most often named instead of a country (unit: activities). Codes not in the IATI Region codelist, such as AA, have no name.")
+rd("spatial_links_unplaced.csv") |>
+  pivot_wider(names_from = placement, values_from = links) |>
+  select(side, `one country`, `several countries`, `region only`, `no country or region`) |>
+  mutate(across(-side, fmt)) |>
+  kable(caption = "Network links by where their end activities can be placed (unit: links).")
+```
+
+Country codes with no border on the map (`r nrow(distinct(off_map, country))` codes, `r fmt(sum(off_map$denominator[off_map$indicator == 1]))` activities in total): `r paste(sort(unique(off_map$country)), collapse = ", ")`. Most are outdated or mistyped codes (for example `UK`, `ZR`, `YU`). The rest are territories that the map draws as part of another country (for example `RE`, `GF`), or placeholders (`XX`, `ZZ`).
+
+:::
+
+## 10. Funding that reaches mapped local work
+
+```{r geo-setup}
+library(leaflet)
+geo_ch    <- rd_codes("geo_chains.csv")
+geo_pt    <- rd_codes("geo_chain_points.csv")
+geo_org   <- rd_codes("geo_chain_orgs.csv")
+geo_ctx   <- rd_codes("geo_chain_context.csv")
+geo_steps <- rd_codes("chain_steps.csv")
+# Context lines per chain (config.CONTEXT_FLOWS_N, recorded in the manifest; an older
+# manifest lacks it, so then the largest number drawn for any chain is shown)
+ctx_n <- man$settings$CONTEXT_FLOWS_N %||% max(count(geo_ctx, chain_id)$n)
+set.seed(1) # the small offsets of context lines are random
+
+# ---- shared pieces --------------------------------------------------------------
+world_ne <- ne_countries(scale = "medium", returnclass = "sf") |>
+  filter(continent != "Antarctica") |>
+  mutate(iso2 = if_else(iso_a2_eh == "-99", iso_a2, iso_a2_eh))
+# One label point per country code. Natural Earth has 3 shapes coded AU (Australia and
+# two territories) and several coded -99; joining on iso2 would repeat rows. Keep the
+# most populous shape per code, and drop -99.
+ne_one <- world_ne |> st_drop_geometry() |> filter(!is.na(iso2), iso2 != "-99") |>
+  arrange(desc(pop_est)) |> distinct(iso2, .keep_all = TRUE)
+stopifnot(!anyDuplicated(ne_one$iso2))
+ne_labels <- ne_one |> select(iso2, cname = name, lx = label_x, ly = label_y)
+clean_name <- function(x) x |> str_replace_all("&amp;", "&") |> str_replace_all("&#0?39;", "'") |> str_replace_all("&quot;", '"')
+short_name <- function(x) {
+  x <- clean_name(x)
+  acr <- str_match(x, "\\(([A-Z][A-Za-z]{1,9})\\)")[, 2]
+  if_else(!is.na(acr) & nchar(x) > 30, acr, str_trunc(x, 32))
+}
+role_col <- c(Funder = "#2a78d6", Intermediary = "#e8743b", Implementer = "#2f9e6e")
+link_lab <- c("Traced link", "Missing link / country only", "Other flows")
+link_col <- setNames(c("black", "#c0392b", "grey65"), link_lab)
+link_lty <- setNames(c("solid", "22", "solid"), link_lab)
+link_lwd <- setNames(c(0.9, 0.8, 0.25), link_lab)
+pt_lab <- c("Implementer / exact point", "Approximate point")
+base_theme <- theme_void(base_size = 9) +
+  theme(panel.background = element_rect(fill = "#f4f3ef", colour = NA),
+        plot.title = element_text(face = "bold", size = 10, margin = margin(b = 4)),
+        legend.position = "bottom")
+
+# Organisations sharing a country are spread on a small circle around its label point
+place_orgs <- function(o) {
+  o |> group_by(org_country) |>
+    mutate(k = row_number(), n = n(), ang = 2 * pi * (k - 1) / pmax(n, 1) + pi / 2,
+           r = if_else(n > 1, 1.6, 0), x = lon + r * cos(ang), y = lat + r * sin(ang) * 0.8) |>
+    ungroup()
+}
+to_ee <- function(df, x = "x", y = "y") {
+  p <- st_as_sf(df, coords = c(x, y), crs = 4326, remove = FALSE) |> st_transform(ee)
+  bind_cols(df, as_tibble(st_coordinates(p)) |> rename(px = X, py = Y))
+}
+
+# ---- panel A: global view -------------------------------------------------------
+panel_global <- function(id) {
+  o <- geo_org |> filter(chain_id == id) |> arrange(position) |>
+    distinct(org_ref, .keep_all = TRUE) |> place_orgs() |> to_ee() |>
+    mutate(role = str_to_title(role), lab = paste0(short_name(org_name), " (", org_country, ")"))
+  links <- geo_org |> filter(chain_id == id) |> arrange(position) |>
+    transmute(from = org_ref, to = lead(org_ref)) |> filter(!is.na(to)) |>
+    left_join(select(o, org_ref, x1 = px, y1 = py), by = c(from = "org_ref")) |>
+    left_join(select(o, org_ref, x2 = px, y2 = py), by = c(to = "org_ref")) |>
+    mutate(kind = link_lab[1])
+  ctx <- geo_ctx |> filter(chain_id == id) |>
+    left_join(select(o, org_ref, x1 = px, y1 = py), by = c(from_org = "org_ref")) |>
+    left_join(ne_labels, by = c(to_country = "iso2")) |>
+    mutate(lx = lx + runif(n(), -1.5, 1.5), ly = ly + runif(n(), -1.5, 1.5)) |>
+    to_ee("lx", "ly") |> rename(x2 = px, y2 = py) |> mutate(kind = link_lab[3])
+  end_c <- o$org_country[o$role == "Implementer"]
+  box <- world_ne |> filter(iso2 == end_c) |> st_transform(ee) |> st_bbox()
+  allx <- c(o$px, ctx$x2, box[c(1, 3)]); ally <- c(o$py, ctx$y2, box[c(2, 4)])
+  padx <- 0.12 * diff(range(allx)) + 4e5; pady <- 0.12 * diff(range(ally)) + 4e5
+  w <- diff(range(allx)) + 2 * padx; h <- diff(range(ally)) + 2 * pady
+  if (w < 1.5 * h) padx <- padx + (1.5 * h - w) / 2
+  ggplot() +
+    geom_sf(data = st_transform(world_ne, ee), fill = "#e3e2dd", colour = "white", linewidth = 0.15) +
+    geom_curve(data = ctx, aes(x1, y1, xend = x2, yend = y2, colour = kind, linetype = kind, linewidth = kind),
+               curvature = 0.2) +
+    geom_point(data = ctx, aes(x2, y2), colour = "grey55", size = 0.7) +
+    geom_curve(data = links, aes(x1, y1, xend = x2, yend = y2, colour = kind, linetype = kind, linewidth = kind),
+               curvature = -0.25, arrow = arrow(length = unit(1.6, "mm"), type = "closed")) +
+    geom_segment(data = tibble(kind = link_lab, x = min(allx) - 5e7, y = min(ally) - 5e7),
+                 aes(x, y, xend = x + 1, yend = y, colour = kind, linetype = kind, linewidth = kind)) +
+    annotate("rect", xmin = box[1], xmax = box[3], ymin = box[2], ymax = box[4], fill = NA, colour = "grey20", linewidth = 0.4) +
+    geom_point(data = o, aes(px, py, fill = role), shape = 21, colour = "white", size = 3.2, stroke = 0.6) +
+    geom_text_repel(data = o, aes(px, py, label = lab), size = 2.5, seed = 2, min.segment.length = 0,
+                    box.padding = 0.4, segment.colour = "grey40", segment.size = 0.25) +
+    scale_fill_manual(values = role_col, name = NULL, limits = names(role_col)) +
+    scale_colour_manual(values = link_col, name = NULL, limits = link_lab, drop = FALSE) +
+    scale_linetype_manual(values = link_lty, name = NULL, limits = link_lab, drop = FALSE) +
+    scale_linewidth_manual(values = link_lwd, name = NULL, limits = link_lab, drop = FALSE) +
+    coord_sf(crs = ee, xlim = range(allx) + c(-padx, padx), ylim = range(ally) + c(-pady, pady),
+             expand = FALSE, datum = NA) +
+    labs(title = "A. Organisations placed by country of registration") +
+    base_theme
+}
+
+# ---- panel B: the implementer's country -------------------------------------------
+panel_country <- function(id, missing_last = FALSE) {
+  o <- geo_org |> filter(chain_id == id) |> arrange(position)
+  imp <- filter(o, role == "implementer"); prev <- filter(o, position == max(position) - 1)
+  cc <- imp$org_country
+  crs_l <- sprintf("+proj=laea +lat_0=%.3f +lon_0=%.3f", imp$lat, imp$lon)  # local equal-area
+  shape <- world_ne |> filter(iso2 == cc) |> st_transform(crs_l)
+  bb <- st_bbox(shape); w <- max(bb[3] - bb[1], bb[4] - bb[2]); m <- 0.12 * w
+  extra <- max(0, 0.9 * (bb[4] - bb[2]) - (bb[3] - bb[1])) / 2  # widen narrow countries
+  bb[1] <- bb[1] - extra; bb[3] <- bb[3] + extra
+  node <- to_ee(tibble(x = imp$lon, y = imp$lat)) |> st_as_sf(coords = c("x", "y"), crs = 4326) |>
+    st_transform(crs_l) |> st_coordinates()
+  pts <- geo_pt |> filter(chain_id == id, is_end, point_usable)
+  pts_xy <- if (nrow(pts)) st_as_sf(pts, coords = c("lon", "lat"), crs = 4326) |> st_transform(crs_l) |> st_coordinates() else matrix(numeric(0), ncol = 2)
+  pts <- bind_cols(pts, tibble(px = pts_xy[, 1], py = pts_xy[, 2])) |>
+    mutate(kind = if_else(coalesce(as.character(exactness), "") %in% c("1", "1.0"), pt_lab[1], pt_lab[2]),
+           lab = str_trunc(coalesce(clean_name(location_name), ""), 26))
+  entry <- c(bb[1] + 0.05 * w, bb[2] + 0.02 * w)  # incoming link from the lower left
+  in_kind <- link_lab[1]
+  p <- ggplot() +
+    geom_sf(data = st_transform(world_ne, crs_l), fill = "#ecebe7", colour = "white", linewidth = 0.3) +
+    geom_sf(data = shape, fill = "#d9d7d1", colour = "grey55", linewidth = 0.3) +
+    annotate("curve", x = entry[1], y = entry[2], xend = node[1], yend = node[2], curvature = -0.2,
+             colour = link_col[in_kind], linetype = link_lty[in_kind], linewidth = 1,
+             arrow = arrow(length = unit(2, "mm"), type = "closed")) +
+    annotate("text", x = entry[1], y = entry[2], hjust = 0, vjust = 1.3, size = 2.6,
+             label = paste0("from ", short_name(prev$org_name), " (", prev$org_country, ")"))
+  if (nrow(pts)) {
+    p <- p + geom_curve(data = pts, aes(x = node[1], y = node[2], xend = px, yend = py), curvature = 0.15,
+                        colour = "black", linewidth = 0.35, arrow = arrow(length = unit(1.4, "mm"), type = "closed")) +
+      geom_point(data = pts, aes(px, py, shape = kind), colour = role_col["Implementer"], fill = role_col["Implementer"],
+                 size = 2.6, stroke = 0.9) +
+      geom_text_repel(data = pts, aes(px, py, label = lab), size = 2.4, seed = 3, colour = "grey25",
+                      min.segment.length = 0.3, segment.size = 0.2, max.overlaps = 15)
+  } else {
+    cx <- node[1] + 0.2 * w; cy <- node[2] + 0.17 * w
+    p <- p + annotate("segment", x = node[1], y = node[2], xend = cx, yend = cy,
+                      colour = link_col[2], linetype = "22", linewidth = 0.8) +
+      annotate("point", x = cx, y = cy, shape = 21, size = 9, colour = link_col[2], fill = "#f4f3ef", stroke = 0.8) +
+      annotate("text", x = cx, y = cy + 0.06 * w, colour = link_col[2], size = 2.6, vjust = 0,
+               label = "country only:\nno location published")
+  }
+  p + annotate("point", x = node[1], y = node[2], shape = 21, size = 3.6, fill = role_col["Implementer"],
+               colour = "white", stroke = 0.7) +
+    annotate("label", x = node[1], y = node[2] - 0.035 * w, vjust = 1, size = 2.6, label.size = 0, fill = alpha("white", 0.75),
+             label = paste0(str_wrap(short_name(imp$org_name), 28), "\n(registered in ", imp$country_name, ")")) +
+    geom_point(data = tibble(kind = pt_lab, x = bb[1] - 10 * w, y = bb[2] - 10 * w),
+               aes(x, y, shape = kind), colour = role_col[["Implementer"]], fill = role_col[["Implementer"]],
+               size = 2.6, stroke = 0.9) +
+    scale_shape_manual(values = setNames(c(21, 1), pt_lab), limits = pt_lab, name = NULL, drop = FALSE) +
+    coord_sf(crs = crs_l, xlim = c(bb[1] - m, bb[3] + m), ylim = c(bb[2] - m, bb[4] + m), expand = FALSE, datum = NA) +
+    labs(title = paste0("B. ", imp$country_name, ": where the chain ends")) +
+    base_theme
+}
+
+example_figure <- function(id, missing_last = FALSE) {
+  ch <- filter(geo_ch, chain_id == id)
+  (panel_global(id) | panel_country(id, missing_last)) +
+    plot_layout(widths = c(1.35, 1), guides = "collect") &
+    theme(legend.position = "bottom", legend.text = element_text(size = 8))
+}
+
+
+pts_in  <- s6$valid_points_in_recipient_country
+probs   <- s6$chains_min_steps_by_end_problem
+show_ids <- geo_ch |> filter(showcase) |> arrange(showcase_rank) |> pull(chain_id)
+ctr_id   <- geo_ch |> filter(counterexample) |> pull(chain_id)
+describe_chain <- function(id) {
+  ch <- filter(geo_ch, chain_id == id)
+  st <- filter(geo_steps, chain_id == id) |> arrange(step)
+  p  <- filter(geo_pt, chain_id == id, is_end, point_usable)
+  ex <- sum(coalesce(as.character(p$exactness), "") %in% c("1", "1.0"))
+  # Full names in the text (the acronym if the name gives one); figures use short names
+  nm <- clean_name(str_split_1(ch$path_orgs, " > "))
+  acr <- str_match(nm, "\\(([A-Z][A-Za-z]{1,9})\\)")[, 2]
+  orgs <- paste(if_else(!is.na(acr), acr, nm), collapse = " → ")
+  steps_txt <- paste0("step ", st$step, " ", st$evidence, " (", st$first_year,
+                      if_else(st$last_year > st$first_year, paste0("–", st$last_year), ""), ")", collapse = "; ")
+  pts_txt <- if (nrow(p)) paste0(nrow(p), " usable point(s) for the end activity, ", ex, " of them marked exact: ",
+                                 paste(unique(na.omit(str_trunc(clean_name(p$location_name), 40))), collapse = "; "), ".")
+             else paste0("The end activity has no usable point (", ch$end_problem, ").")
+  cat("**", orgs, "**\n\n", ch$steps, " steps, ", ch$n_confirmed_steps, " confirmed by both sides: ", steps_txt,
+      ". End activity `", ch$end_activity, "` (", ch$end_org_type, "). ", pts_txt, "\n\n", sep = "")
+}
+```
+
+Section 9 shows traceability by country. This section goes below country level. It shows chains of funding that can be followed, activity by activity, from a funder through intermediaries to an implementing organisation, and that end at an activity which publishes where it works. These are rare, so the section presents **examples**, not a measure. The aim is to show what full traceability looks like when it reaches smaller, local organisations, and what is lost when it does not.
+
+- **Locations.** `r fmt(s6$locations)` locations are published for `r fmt(s6$activities_with_location)` activities (unit: locations; activities). `r fmt(s6$activities_with_valid_point)` activities give at least one valid point; `r fmt(s6$activities_with_usable_point)` give at least one usable point (inside a recipient country, below country level).
+- **In the network.** `r fmt(s6$network_activities_with_valid_point)` of the `r fmt(s6$network_activities)` activities in the network have a valid point (unit: activities).
+- **Chains.** Of `r fmt(s6$chains_min_steps)` chains of two or more steps, `r fmt(s6$chains_min_steps_end_usable)` end at an activity with a usable point, and `r fmt(s6$chains_min_steps_end_usable_local)` of these end at a local organisation (unit: chains). `r fmt(probs[["no location"]])` end at an activity with no location at all.
+
+### Method: locations, the point check and the choice of examples
+
+**Locations.** Stage 6 reads the `<location>` elements of each activity directly from the XML of the bulk copy (`locations.parquet`), for the copy of the activity kept in stage 2. Version 2 gives a point as `<point><pos>latitude longitude</pos></point>`; version 1 as `<coordinates latitude longitude>`. Both are read. `<location>` elements inside results and indicators only refer back to these, and are not counted.
+
+**Valid and usable points.** A point is *valid* if latitude and longitude can be read, lie in range and are not 0,0, a common placeholder. Of the valid points, `r fmt(pts_in[["True"]])` lie inside one of their activity's recipient countries and `r fmt(pts_in[["False"]])` lie outside all of them. The check uses the Natural Earth borders of the maps, widened by about 25 km for coasts and borders (`POINT_COUNTRY_TOLERANCE_DEG`). `r fmt(s6$valid_points_country_level)` points are coded as a whole country (GeoNames feature `PCL…`). A point is *usable* for the examples if it is valid, inside a recipient country, and not country-level.
+
+**Where organisations are drawn.** IATI gives no address for organisations. Each organisation is drawn at its *country of registration*: the country prefix of its identifier (`GB-CHC-…` → United Kingdom). Identifiers without a country prefix (`XM-`, `XI-`, `XR-` and legacy codes) are drawn at the organisation's headquarters country in the IATI Registry, if it publishes. This covers both governments that publish under their OECD-DAC donor code (`XM-DAC-` below 900, for example `XM-DAC-7`, the Netherlands), which count as national, and international bodies (other `XM-`, `XI-` and `XR-` identifiers). Organisations in the same country are spread on a small circle. This is where an organisation is registered, not where it works. Only the end activity's points (panel B) show where work happens.
+
+**Choice of examples.** Chains whose end activity has a usable point are ranked:
+
+1. the end publisher is a local organisation (local government, national, regional or partner-country NGO, private sector in the recipient country);
+2. more steps confirmed by both sides;
+3. more steps;
+4. more activities on the chain with usable points.
+
+To show different routes, only the best-ranked chain is kept for each organisation path, each end publisher, and each route before the end publisher. A chain that ends at an organisation it already passed through is left out. The first `r length(show_ids)` are shown. The **counter-example** is the best-ranked chain by the same rules whose end activity has *no* usable point. All candidates are in the tab "All candidates" and in `geo_chains.csv`.
+
+**Reading the figures.** Panel A places the organisations of the chain by country of registration. Black arrows are traced links between activities; grey lines are other organisation links of the same organisations (context, up to `r ctx_n` per chain). Panel B shows the implementer's country on an equal-area projection centred on it. The implementer is drawn at the country's label point, with arrows to the points its activity publishes: filled if marked exact (`exactness` 1), hollow if approximate or not stated. In the counter-example, a dashed red line marks the missing location.
+
+::: {.panel-tabset}
+
+### Example 1
+
+```{r geo-example-1, fig.width = 11, fig.height = 5, results = "asis"}
+#| fig-cap: "Example 1. A: organisations by country of registration. B: where the chain ends."
+describe_chain(show_ids[1])
+example_figure(show_ids[1])
+```
+
+### Example 2
+
+```{r geo-example-2, fig.width = 11, fig.height = 5, results = "asis"}
+#| fig-cap: "Example 2. A: organisations by country of registration. B: where the chain ends."
+describe_chain(show_ids[2])
+example_figure(show_ids[2])
+```
+
+### Example 3
+
+```{r geo-example-3, fig.width = 11, fig.height = 5, results = "asis"}
+#| fig-cap: "Example 3. A: organisations by country of registration. B: where the chain ends."
+describe_chain(show_ids[3])
+example_figure(show_ids[3])
+```
+
+### Example 4
+
+```{r geo-example-4, fig.width = 11, fig.height = 5, results = "asis"}
+#| fig-cap: "Example 4. A: organisations by country of registration. B: where the chain ends."
+describe_chain(show_ids[4])
+example_figure(show_ids[4])
+```
+
+### Example 5
+
+```{r geo-example-5, fig.width = 11, fig.height = 5, results = "asis"}
+#| fig-cap: "Example 5. A: organisations by country of registration. B: where the chain ends."
+describe_chain(show_ids[5])
+example_figure(show_ids[5])
+```
+
+### Counter-example
+
+The same kind of chain, traced to a local organisation, but its end activity publishes no usable location. The money can be followed to the organisation and the country, but not to a place.
+
+```{r geo-counter, fig.width = 11, fig.height = 5, results = "asis"}
+#| fig-cap: "Counter-example. The end activity publishes no usable location (dashed red)."
+describe_chain(ctr_id)
+example_figure(ctr_id, missing_last = TRUE)
+```
+
+### Interactive
+
+Every candidate chain whose end activity has a usable point (`r sum(!is.na(geo_ch$showcase_rank))` chains). Click a point for the chain; larger points are the examples. The map uses the Web Mercator projection, which enlarges areas far from the equator; use it to explore, not to compare sizes. Country borders are Natural Earth, built into the report, so it works offline.
+
+```{r geo-interactive}
+cand <- geo_pt |> filter(is_end, point_usable, !is.na(showcase_rank)) |>
+  left_join(select(geo_ch, chain_id, path_orgs, steps, n_confirmed_steps, end_local, showcase), by = "chain_id") |>
+  mutate(exact = coalesce(as.character(exactness), "") %in% c("1", "1.0"),
+         popup = paste0("<b>", clean_name(org_name), "</b><br>", clean_name(coalesce(location_name, "")), "<br>",
+                        str_replace_all(clean_name(path_orgs), " > ", " &rarr; "), "<br>",
+                        steps, " steps, ", n_confirmed_steps, " confirmed", if_else(showcase, " (example)", "")))
+leaflet(cand, height = 520) |>
+  addPolygons(data = ne_countries(scale = "small", returnclass = "sf"), color = "white", weight = 0.6,
+              fillColor = "#e3e2dd", fillOpacity = 1) |>
+  addCircleMarkers(~lon, ~lat, popup = ~popup, radius = ~if_else(showcase, 7, 5),
+                   color = role_col[["Implementer"]], weight = 2,
+                   fillColor = ~if_else(exact, role_col[["Implementer"]], "white"), fillOpacity = 0.9) |>
+  fitBounds(min(cand$lon) - 3, min(cand$lat) - 3, max(cand$lon) + 3, max(cand$lat) + 3)
+```
+
+### All candidates
+
+```{r geo-candidates}
+geo_ch |> filter(!is.na(showcase_rank) | counterexample) |>
+  arrange(showcase_rank) |>
+  transmute(rank = showcase_rank, counterexample, route = clean_name(path_orgs), steps, confirmed = n_confirmed_steps,
+            end_type = end_org_type, usable_points = end_points_usable, years = paste0(first_year, "–", last_year)) |>
+  DT::datatable(rownames = FALSE, options = list(pageLength = 10, scrollX = TRUE))
+```
+
+### Coverage
+
+```{r geo-coverage}
+tibble(`End activity of the chain` = names(probs), Chains = unlist(probs)) |>
+  arrange(desc(Chains)) |> mutate(Chains = fmt(Chains)) |>
+  kable(caption = "Chains of two or more steps, by what their end activity publishes (unit: chains).")
+tibble(Status = c(names(s6$locations_by_point_status), "valid, inside a recipient country", "valid, outside all recipient countries",
+                  "valid, coded as a whole country", "usable"),
+       Locations = c(unlist(s6$locations_by_point_status), pts_in[["True"]], pts_in[["False"]],
+                     s6$valid_points_country_level, s6$usable_points)) |>
+  mutate(Locations = fmt(Locations)) |>
+  kable(caption = "Published locations, by the point check (unit: locations).")
+```
+
+:::
+
+## 11. Flows between countries
+
+```{r flows-setup}
+cf <- rd_codes("country_flows.csv")
+fl <- \(k) s6[[paste0("flows_", k)]] # e.g. fl("links_domestic") is s6$flows_links_domestic
+stopifnot(!is.null(fl("links")), !is.null(fl("links_to_one_country")))
+# Lines coloured by the funder's country: the three with most cross-border links, then the rest
+flow_col <- c("#2a78d6", "#e8743b", "#2f9e6e", "grey55")
+pos_ee <- ne_one |> select(iso2, cname = name, lx = label_x, ly = label_y) |> # one row per code
+  st_as_sf(coords = c("lx", "ly"), crs = 4326, remove = FALSE) |> st_transform(ee) |>
+  mutate(px = st_coordinates(geometry)[, 1], py = st_coordinates(geometry)[, 2]) |> st_drop_geometry()
+# National funders with a known country, to activities in one country. International bodies are
+# not drawn: their headquarters say little about where their money comes from.
+placed <- cf |> filter(to_is_country, from_country != "unknown", !from_international)
+top_from <- placed |> filter(!domestic) |> count(from_country, wt = links, sort = TRUE) |> slice_head(n = 3) |>
+  left_join(select(pos_ee, iso2, cname), by = c(from_country = "iso2"))
+top_n <- 40
+cross <- placed |> filter(!domestic) |>
+  mutate(funder = factor(if_else(from_country %in% top_from$from_country,
+                                  top_from$cname[match(from_country, top_from$from_country)], "Other countries"),
+                          c(top_from$cname, "Other countries"))) |>
+  group_by(from_country, to_place, funder) |> summarise(links = sum(links), .groups = "drop") |>
+  slice_max(links, n = top_n, with_ties = FALSE) |>
+  left_join(select(pos_ee, iso2, x1 = px, y1 = py), by = c(from_country = "iso2")) |>
+  left_join(select(pos_ee, iso2, x2 = px, y2 = py), by = c(to_place = "iso2")) |>
+  filter(!is.na(x1), !is.na(x2)) |> arrange(links)
+```
+
+Section 9 maps traceability where the money goes, and section 10 follows single chains. This section asks a simpler question about the whole network: **where are funders registered, and in which countries do the activities they are linked to work?** It counts the `r fmt(fl("links"))` links in the network (unit: links; plausible links between activities of different organisations, all years).
+
+- Each link is drawn from the **country of registration of the funding organisation** to the **recipient country of the receiving activity**. The country of registration is the identifier's country prefix (`GB-CHC-…` → United Kingdom); for government donors that publish under their OECD-DAC donor code (`XM-DAC-7`, the Netherlands), it is their headquarters country in the IATI Registry. This is the rule of section 10.
+- `r fmt(fl("links_to_one_country"))` links go to an activity that names exactly one country. The others go to activities that name several countries, only a region, or nothing (tab "Not drawn"), and cannot be drawn.
+- `r fmt(fl("links_funder_international"))` links are funded by **international bodies** (`XI-`, `XR-` and other `XM-` identifiers: the EU, UN agencies and pooled funds, development banks). They are counted in the tables but not drawn: a headquarters says little about where their money comes from. `r n_unknown_national <- sum(cf$links[!cf$from_international & cf$from_country == "unknown"]); fmt(n_unknown_national)` further link`r if (n_unknown_national == 1) "" else "s"` ha`r if (n_unknown_national == 1) "s" else "ve"` a funder whose country is unknown.
+- Counting all funders with a known country, `r fmt(fl("links_domestic"))` links are **domestic** (the funder is registered in the recipient country) and `r fmt(fl("links_cross_border"))` cross a border. The map shows national funders only: `r fmt(sum(placed$links[placed$domestic]))` domestic links (circles) and `r fmt(sum(placed$links[!placed$domestic]))` cross-border links, of which the 40 largest country pairs are drawn (lines; `r fmt(sum(cross$links))` links).
+- In `r fmt(fl("links_receiver_registered_in_recipient_country"))` links (`r round(100 * fl("links_receiver_registered_in_recipient_country") / fl("links_to_one_country"), 1)`% of those going to one country) the **receiving organisation is registered in the recipient country**: the money reaches a local organisation in a traceable way.
+
+These are links, not money: a link can rest on one transaction or many, and values are not added across currencies.
+
+```{r flows-options-setup}
+# Options for showing the same cross-border links (national funders, one recipient country)
+flow_x <- placed |> filter(!domestic) |> group_by(from_country, to_place) |> summarise(links = sum(links), .groups = "drop")
+flow_pos <- ne_one |> # one row per country code (see geo-setup)
+  transmute(iso2, cname = name, lon = label_x, lat = label_y, region_wb) |>
+  left_join(select(pos_ee, iso2, px, py), by = "iso2")
+flow_name <- \(iso) coalesce(flow_pos$cname[match(iso, flow_pos$iso2)], iso)
+flow_region <- \(iso) coalesce(flow_pos$region_wb[match(iso, flow_pos$iso2)], "Other")
+flow_ink <- "grey15"; flow_land <- "#e7e6e1"
+funder_cols <- c("United Kingdom" = "#2a78d6", "Netherlands" = "#e8743b", "United States" = "#2f9e6e", "Other national funders" = "grey45")
+flow_x <- flow_x |> mutate(funder = factor(case_when(from_country == "GB" ~ "United Kingdom", from_country == "NL" ~ "Netherlands",
+                                                     from_country == "US" ~ "United States", TRUE ~ "Other national funders"), names(funder_cols)))
+flow_by_funder <- count(flow_x, from_country, wt = links, name = "n") |> arrange(desc(n))
+flow_marks <- tibble(funder = factor(c("United Kingdom", "Netherlands", "United States"), names(funder_cols)), iso2 = c("GB", "NL", "US")) |>
+  left_join(flow_pos, by = "iso2")
+flow_thr <- 10 # option D draws every pair with at least this many links
+flow_d_cap <- paste0("Option D. Cross-border links for every country pair with ", flow_thr, " or more links, all years, drawn along the shortest path between the two countries. National funders only. Equal Earth projection. Unit: links.")
+```
+
+The figure below is under review, so the same links are also drawn in other ways. In the current map, `r sum(cross$from_country %in% c("GB", "NL"))` of the `r nrow(cross)` largest pairs have a funder registered in the United Kingdom or the Netherlands, so other funders and most of South America drop out. The options use all `r fmt(sum(flow_x$links))` cross-border links from national funders (`r fmt(nrow(flow_x))` country pairs), except where stated.
+
+| Option | What it shows | Strength | Weakness |
+|---|---|---|---|
+| A. Small maps | One map per funder group, with circles at recipient countries | Keeps geography; no lines; every funder group is visible | Connections are implied by the panel, not drawn |
+| B. Ribbons | Every link, from funder to recipient country and region | Most literal view of connection and size | Busy; no map |
+| C. Matrix | Counts by funder country and recipient country | Most precise; prints well | Shows 10 funders and 28 recipients; no map |
+| D. Map with routes | Shortest-path lines for every pair with `r flow_thr` or more links | Closest to the current map | Crowded around London and Amsterdam |
+
+::: {.panel-tabset}
+
+### Current map
+
+```{r fig-flows-map, fig.width = 10, fig.height = 5.6}
+#| fig-cap: "Network links by the country of registration of national funders and the receiving activity's country, all years. Lines: the 40 largest cross-border pairs. Circles: links within one country. Equal Earth projection."
+dom <- placed |> filter(domestic) |> group_by(to_place) |> summarise(links = sum(links), .groups = "drop") |>
+  left_join(pos_ee, by = c(to_place = "iso2")) |> filter(!is.na(px))
+recv <- placed |> group_by(to_place) |> summarise(links = sum(links), .groups = "drop") |>
+  slice_max(links, n = 12) |> left_join(pos_ee, by = c(to_place = "iso2"))
+send <- cross |> group_by(from_country) |> summarise(links = sum(links)) |> slice_max(links, n = 3) |>
+  left_join(pos_ee, by = c(from_country = "iso2"))
+ggplot() +
+  geom_sf(data = st_transform(world_ne, ee), fill = "#e3e2dd", colour = "white", linewidth = 0.15) +
+  geom_curve(data = cross, aes(x1, y1, xend = x2, yend = y2, linewidth = links, colour = funder),
+             curvature = 0.25, alpha = 0.7, lineend = "round") +
+  geom_point(data = dom, aes(px, py, size = links), shape = 21, fill = NA, colour = "grey15", stroke = 0.6) +
+  geom_text_repel(data = recv, aes(px, py, label = cname), size = 2.6, colour = "grey20", seed = 1,
+                  min.segment.length = 0.2, segment.size = 0.2, box.padding = 0.3) +
+  geom_text_repel(data = send, aes(px, py, label = cname), size = 2.8, fontface = "bold", colour = "#1d4f91",
+                  seed = 2, nudge_y = 6e5) +
+  scale_linewidth_continuous(range = c(0.2, 2.6), name = "Links between countries") +
+  scale_size_area(max_size = 10, name = "Links within one country") +
+  scale_colour_manual(values = setNames(flow_col, levels(cross$funder)), name = "Funder registered in") +
+  coord_sf(crs = ee, datum = NA, ylim = c(-4.2e6, 7.6e6)) +
+  theme_void(base_size = 9) +
+  theme(panel.background = element_rect(fill = "#f4f3ef", colour = NA), legend.position = "bottom",
+        legend.box = "vertical")
+```
+
+### Option A: small maps
+
+```{r fig-flows-option-a, fig.width = 10, fig.height = 5.2}
+#| fig-cap: "Option A. Cross-border links by funder group, all years. Circle area shows the number of links (same scale in every panel). Triangle: funder country. National funders only. Equal Earth projection. Unit: links."
+a_d <- flow_x |> group_by(funder, to_place) |> summarise(links = sum(links), .groups = "drop") |>
+  left_join(flow_pos, by = c(to_place = "iso2")) |> filter(!is.na(px))
+a_hd <- flow_x |> group_by(funder) |> summarise(n = sum(links), k = n_distinct(to_place)) |>
+  mutate(lab = paste0(funder, ": ", fmt(n), " links to ", k, " countries"))
+a_hd$lab <- factor(a_hd$lab, a_hd$lab)
+a_d <- left_join(a_d, select(a_hd, funder, lab), by = "funder")
+a_tri <- left_join(flow_marks, select(a_hd, funder, lab), by = "funder")
+ggplot() +
+  geom_sf(data = st_transform(world_ne, ee), fill = flow_land, colour = "white", linewidth = 0.1) +
+  geom_point(data = arrange(a_d, desc(links)), aes(px, py, size = links, fill = funder), shape = 21, colour = "white", stroke = 0.3, alpha = 0.9) +
+  geom_point(data = a_tri, aes(px, py), shape = 17, size = 2.2, colour = flow_ink) +
+  geom_text_repel(data = group_by(a_d, lab) |> slice_max(links, n = 5, with_ties = FALSE), aes(px, py, label = cname),
+                  size = 2.3, colour = flow_ink, seed = 3, min.segment.length = 0.1, segment.size = 0.2, box.padding = 0.25, max.overlaps = 20) +
+  scale_size_area(max_size = 11, breaks = c(10, 50, 150, 300), name = "Links between the funder country and the recipient country",
+                  guide = guide_legend(override.aes = list(shape = 21, fill = "grey55", colour = "white"))) +
+  scale_fill_manual(values = funder_cols, guide = "none") +
+  facet_wrap(~lab, ncol = 2) +
+  coord_sf(crs = ee, datum = NA, ylim = c(-4.3e6, 7.7e6)) +
+  theme_void(base_size = 9) +
+  theme(legend.position = "bottom", strip.text = element_text(face = "bold", hjust = 0, size = 9, margin = margin(b = 3, t = 4)))
+```
+
+### Option B: ribbons
+
+```{r fig-flows-option-b, fig.width = 10, fig.height = 7.2}
+#| fig-cap: "Option B. All cross-border links from national funders, all years, from the funder's country of registration to the recipient country and region. Ribbon width shows the number of links. Numbers are links."
+b_x <- flow_x |> mutate(region = recode(flow_region(to_place), "East Asia & Pacific" = "East Asia and Pacific", "Middle East & North Africa" = "Middle East and North Africa",
+                                        "Latin America & Caribbean" = "Latin America and Caribbean", "Europe & Central Asia" = "Europe and Central Asia", "North America" = "Other"))
+b_top <- b_x |> count(to_place, region, wt = links, name = "n") |> group_by(region) |>
+  mutate(r = row_number(desc(n))) |> filter(r <= if_else(region == "Sub-Saharan Africa", 14L, 3L), region != "Other") |> pull(to_place)
+b_reg <- b_x |> count(region, wt = links, name = "n") |> arrange(desc(n)) |> pull(region)
+b_key <- slice_head(flow_by_funder, n = 5)$from_country
+b_x <- b_x |> mutate(dest = if_else(to_place %in% b_top, flow_name(to_place), if_else(region == "Other", "Other", paste0("Other ", region))),
+                     src = if_else(from_country %in% b_key, str_remove(flow_name(from_country), " of America$"), "Other national funders"))
+b_fl <- b_x |> group_by(src, dest, region) |> summarise(n = sum(links), .groups = "drop")
+b_gap <- 40
+b_src <- b_fl |> count(src, wt = n, name = "t") |> arrange(src == "Other national funders", desc(t)) |> mutate(y1 = cumsum(lag(t + b_gap, default = 0)))
+b_dst <- b_fl |> group_by(region, dest) |> summarise(t = sum(n), .groups = "drop") |>
+  mutate(region = factor(region, b_reg)) |> arrange(region, startsWith(dest, "Other"), desc(t)) |>
+  mutate(rg = as.integer(region), y1 = cumsum(lag(t + b_gap / 2, default = 0)) + (rg - 1) * b_gap * 2.2, y2 = y1 + t)
+b_src <- b_src |> mutate(y1 = y1 * max(b_dst$y2) / max(y1 + t), y2 = y1 + t)
+b_fl <- b_fl |> mutate(s = match(src, b_src$src), d = match(dest, b_dst$dest)) |>
+  arrange(s, d) |> group_by(src) |> mutate(s_off = cumsum(lag(n, default = 0))) |> ungroup() |>
+  arrange(d, s) |> group_by(dest) |> mutate(d_off = cumsum(lag(n, default = 0))) |> ungroup() |>
+  mutate(sy = b_src$y1[s] + s_off, dy = b_dst$y1[d] + d_off, id = row_number())
+b_t <- seq(0, 1, length.out = 40); b_ease <- 3 * b_t^2 - 2 * b_t^3
+b_rib <- b_fl |> rowwise() |> reframe(id = id, src = src, x = c(b_t, rev(b_t)), y = c(sy + (dy - sy) * b_ease, rev(sy + n + (dy - sy) * b_ease)))
+b_cols <- setNames(c("#2a78d6", "#e8743b", "#2f9e6e", "#8a63c9", "#c7a100"), str_remove(flow_name(c("GB", "NL", "US", "SE", "DK")), " of America$"))
+b_cols <- c(b_cols[names(b_cols) %in% b_src$src], setNames(rep("grey55", sum(!b_src$src %in% names(b_cols))), b_src$src[!b_src$src %in% names(b_cols)]))
+b_regs <- b_dst |> group_by(region) |> summarise(y1 = min(y1), y2 = max(y2), t = sum(t)) |> mutate(l = paste0(region, " (", fmt(t), ")"))
+ggplot() +
+  geom_polygon(data = b_rib, aes(x, y, group = id, fill = src), alpha = 0.62, colour = NA) +
+  geom_rect(data = b_src, aes(xmin = -0.012, xmax = 0, ymin = y1, ymax = y2, fill = src)) +
+  geom_rect(data = b_dst, aes(xmin = 1, xmax = 1.012, ymin = y1, ymax = y2), fill = "grey30") +
+  geom_text(data = b_src, aes(-0.02, (y1 + y2) / 2, label = paste0(src, "  ", fmt(t))), hjust = 1, size = 2.9, colour = flow_ink) +
+  geom_text_repel(data = b_dst, aes(1.02, (y1 + y2) / 2, label = paste0(dest, "  ", fmt(t))), hjust = 0, size = 2.35, colour = flow_ink,
+                  direction = "y", xlim = c(1.02, NA), min.segment.length = Inf, box.padding = 0.03, point.padding = 0, force = 0.4, max.overlaps = Inf, seed = 1) +
+  geom_segment(data = b_regs, aes(x = 1.5, xend = 1.5, y = y1, yend = y2), colour = "grey40", linewidth = 0.4) +
+  geom_text(data = b_regs, aes(1.515, (y1 + y2) / 2, label = str_wrap(l, 18)), hjust = 0, size = 2.6, fontface = "bold", colour = flow_ink, lineheight = 0.9) +
+  scale_fill_manual(values = b_cols, guide = "none") +
+  scale_y_reverse() + scale_x_continuous(limits = c(-0.42, 1.85), expand = c(0, 0)) +
+  theme_void(base_size = 9)
+```
+
+### Option C: matrix
+
+```{r fig-flows-option-c, fig.width = 10, fig.height = 4.8}
+#| fig-cap: "Option C. Cross-border links by the funder's country of registration (10 largest) and the recipient country (largest in each region), all years. Empty: no links. Unit: links."
+c_keep <- c("Africa (south of Sahara)" = 12, "Asia" = 7, "Middle East, N. Africa" = 3, "Latin America, Caribbean" = 4, "Europe, C. Asia" = 2)
+c_rows <- slice_head(flow_by_funder, n = 10)$from_country
+c_cols <- flow_x |> count(to_place, wt = links, name = "n") |>
+  mutate(region = recode(flow_region(to_place), "Sub-Saharan Africa" = "Africa (south of Sahara)", "South Asia" = "Asia", "East Asia & Pacific" = "Asia", "Middle East & North Africa" = "Middle East, N. Africa",
+                         "Latin America & Caribbean" = "Latin America, Caribbean", "Europe & Central Asia" = "Europe, C. Asia")) |>
+  filter(region %in% names(c_keep)) |> group_by(region) |> filter(row_number(desc(n)) <= c_keep[region[1]]) |> ungroup() |>
+  mutate(region = factor(region, names(c_keep))) |> arrange(region, desc(n))
+c_m <- flow_x |> filter(from_country %in% c_rows, to_place %in% c_cols$to_place) |>
+  transmute(f = factor(flow_name(from_country), rev(flow_name(c_rows))), t = factor(flow_name(to_place), flow_name(c_cols$to_place)), links,
+            region = c_cols$region[match(to_place, c_cols$to_place)])
+ggplot(c_m, aes(t, f, fill = links)) +
+  geom_tile(colour = "white", linewidth = 0.8) +
+  geom_text(aes(label = links, colour = links > 110), size = 2.4) +
+  scale_colour_manual(values = c(`TRUE` = "white", `FALSE` = "grey15"), guide = "none") +
+  scale_fill_gradient(low = "#dbe9f8", high = "#123f7a", trans = "sqrt", name = "Links", breaks = c(5, 50, 150, 300)) +
+  facet_grid(~region, scales = "free_x", space = "free_x", labeller = label_wrap_gen(9)) +
+  labs(x = NULL, y = "Funder registered in") +
+  theme_minimal(base_size = 9) +
+  theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 50, hjust = 1), strip.text = element_text(face = "bold", hjust = 0),
+        legend.position = "bottom", panel.spacing = unit(4, "pt"))
+```
+
+### Option D: map with routes
+
+```{r fig-flows-option-d, fig.width = 10, fig.height = 6.2}
+#| fig-cap: !expr flow_d_cap
+d_x <- flow_x |> filter(links >= flow_thr) |>
+  left_join(select(flow_pos, iso2, x1 = lon, y1 = lat), by = c(from_country = "iso2")) |>
+  left_join(select(flow_pos, iso2, x2 = lon, y2 = lat), by = c(to_place = "iso2")) |> filter(!is.na(x1), !is.na(x2)) |> arrange(links)
+# Great circle between two points, cut where it crosses the date line so no line runs across the whole map
+d_route <- function(x1, y1, x2, y2, n = 150) {
+  r <- pi / 180; f <- seq(0, 1, length.out = n)
+  a <- c(cos(y1 * r) * cos(x1 * r), cos(y1 * r) * sin(x1 * r), sin(y1 * r))
+  b <- c(cos(y2 * r) * cos(x2 * r), cos(y2 * r) * sin(x2 * r), sin(y2 * r))
+  d <- acos(pmin(1, sum(a * b)))
+  p <- t(sapply(f, \(k) (sin((1 - k) * d) * a + sin(k * d) * b) / sin(d)))
+  co <- cbind(atan2(p[, 2], p[, 1]) / r, asin(p[, 3]) / r)
+  piece <- cumsum(c(0, abs(diff(co[, 1])) > 180))
+  st_multilinestring(Filter(\(m) nrow(m) > 1, lapply(split(seq_len(n), piece), \(i) co[i, , drop = FALSE])))
+}
+d_sf <- st_sf(select(d_x, links, funder), geometry = st_sfc(lapply(seq_len(nrow(d_x)), \(i) d_route(d_x$x1[i], d_x$y1[i], d_x$x2[i], d_x$y2[i])), crs = 4326)) |> st_transform(ee)
+d_recv <- flow_x |> count(to_place, wt = links, name = "n") |> slice_max(n, n = 10) |> left_join(flow_pos, by = c(to_place = "iso2"))
+ggplot() +
+  geom_sf(data = st_transform(world_ne, ee), fill = flow_land, colour = "white", linewidth = 0.1) +
+  geom_sf(data = d_sf, aes(linewidth = links, colour = funder), alpha = 0.55, lineend = "round") +
+  geom_text_repel(data = d_recv, aes(px, py, label = cname), size = 2.5, colour = flow_ink, seed = 1, min.segment.length = 0.1, segment.size = 0.2) +
+  geom_text_repel(data = flow_marks, aes(px, py, label = cname), size = 2.8, fontface = "bold", colour = flow_ink, seed = 2, nudge_y = 7e5) +
+  scale_linewidth_continuous(range = c(0.12, 2.2), breaks = c(10, 50, 150, 300), name = "Links") +
+  scale_colour_manual(values = funder_cols, name = "Funder registered in") +
+  coord_sf(crs = ee, datum = NA) +
+  theme_void(base_size = 9) + theme(legend.position = "bottom", legend.box = "vertical")
+```
+
+### Local receivers
+
+For each recipient country with 30 or more incoming links: the share of links whose receiving organisation is registered in that country.
+
+```{r fig-flows-local, fig.height = 5}
+#| fig-cap: "Share of incoming links received by an organisation registered in the recipient country (unit: links), countries with 30 or more links, all years."
+loc <- cf |> filter(to_is_country) |> group_by(to_place) |>
+  summarise(links = sum(links), local = sum(links_receiver_registered_here), .groups = "drop") |>
+  filter(links >= 30) |> left_join(select(pos_ee, iso2, cname), by = c(to_place = "iso2")) |>
+  mutate(share = 100 * local / links, cname = coalesce(cname, to_place),
+         lab = paste0(cname, " (n = ", fmt(links), ")")) |>
+  slice_max(links, n = 25)
+ggplot(loc, aes(share, fct_reorder(lab, share))) +
+  geom_col(fill = one, width = 0.7) +
+  geom_text(aes(label = paste0(round(share), "%")), hjust = -0.15, size = 2.7) +
+  scale_x_continuous(limits = c(0, 105), labels = \(x) paste0(x, "%")) +
+  labs(x = "Links received by an organisation registered in the country", y = NULL) +
+  theme(panel.grid.major.x = element_line(colour = "grey92"), panel.grid.major.y = element_blank())
+```
+
+### Table
+
+```{r flows-table}
+cf |> transmute(funder_country = from_country, international = from_international, recipient = to_place,
+                links, confirmed = links_confirmed, receiver_registered_here = links_receiver_registered_here,
+                domestic) |>
+  DT::datatable(filter = "top", rownames = FALSE, options = list(pageLength = 10, scrollX = TRUE))
+```
+
+### Not drawn
+
+```{r flows-not-drawn}
+cf |> mutate(recipient = if_else(to_is_country, "one country", to_place),
+             funder = if_else(from_country == "unknown", "funder country unknown", "funder country known")) |>
+  count(recipient, funder, wt = links, name = "links") |>
+  pivot_wider(names_from = funder, values_from = links, values_fill = 0) |>
+  mutate(across(-recipient, fmt)) |>
+  kable(caption = "Network links by what is known about each end (unit: links). Only links with a known funder country and one recipient country are drawn.")
+```
+
+:::
+
+## 12. Exclusions and data issues
+
+```{r issues}
+s2 <- fromJSON(file.path(out, "summaries", "02_clean.json"))
+tribble(
+  ~Issue, ~Count, ~Unit, ~Treatment,
+  "Datasets in the index with no file in the copy", b$datasets_missing_from_copy, "datasets", "Excluded; listed in datasets_missing.csv",
+  "Files that cannot be parsed", b$files_failed, "files", "Excluded",
+  "Activity copies removed as duplicates", s2$activity_copies_removed, "activity copies", "One copy kept per activity",
+  "Exact duplicate transactions", s2$exact_duplicate_transactions, "transactions", "Flagged; left out (D1)",
+  "Internal flows (counterpart is the publisher itself)", s2$counterpart$internal, "transactions", "Left out of link indicators",
+  "Organisation ID written in the activity-ID field", g("x1b")$numerator, "transactions", "Reported as x1b; left out of x1",
+  "Version 1 or named type codes recoded", s2$transactions_by_type_recode$`v1 code` + s2$transactions_by_type_recode$name, "transactions", "Recoded",
+  "Invalid type codes", s2$transactions_by_type_recode$invalid, "transactions", "Kept; no direction"
+) |> mutate(Count = fmt(Count)) |> kable(caption = "Known exclusions and data issues")
+```
+
+## 13. Software
+
+```{r software}
+# R and package versions used for this render (the Python side is in run_manifest.json)
+pkgs <- c("tidyverse", "arrow", "jsonlite", "igraph", "ggraph", "knitr", "sf", "rnaturalearth",
+          "patchwork", "ggrepel", "leaflet", "plotly", "DT", "visNetwork", "viridisLite")
+tibble(package = c("R", pkgs),
+       version = c(paste(R.version$major, R.version$minor, sep = "."),
+                   map_chr(pkgs, \(p) as.character(packageVersion(p))))) |>
+  kable(caption = "R and package versions used for this report")
+```

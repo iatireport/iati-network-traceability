@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 110
+target-version = "py315"  # the Python of .venv
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

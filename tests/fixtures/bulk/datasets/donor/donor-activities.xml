@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture: funder. A1 funds B1 (confirmed by B1) and G1 (confirmed by G1).
+     tx4 has a type written as a name; tx5 has a date typed into the type code. -->
+<iati-activities version="2.03">
+  <iati-activity default-currency="GBP" last-updated-datetime="2025-10-01T00:00:00" xml:lang="en">
+    <iati-identifier>GB-GOV-1-A1</iati-identifier>
+    <reporting-org ref="GB-GOV-1" type="10">
+      <narrative xml:lang="fr">Ministere donateur</narrative>
+      <narrative>Donor Ministry</narrative>
+    </reporting-org>
+    <title><narrative>Donor programme A1</narrative></title>
+    <activity-status code="2"/>
+    <activity-date iso-date="2024-01-01" type="2"/>
+    <activity-date iso-date="2026-12-31" type="3"/>
+    <recipient-country code="UG" percentage="100"/>
+    <default-flow-type code="10"/>
+    <default-finance-type code="110"/>
+    <transaction>
+      <transaction-type code="2"/>
+      <transaction-date iso-date="2024-03-01"/>
+      <value value-date="2024-03-01">1000000</value>
+      <provider-org ref="GB-GOV-1" provider-activity-id="GB-GOV-1-A1"/>
+      <receiver-org ref="GB-CHC-111" receiver-activity-id="GB-CHC-111-B1" type="21"><narrative>Intermediary NGO</narrative></receiver-org>
+    </transaction>
+    <transaction>
+      <transaction-type code="3"/>
+      <transaction-date iso-date="2025-02-01"/>
+      <value currency="USD" value-date="2025-02-01">400000</value>
+      <receiver-org ref="GB-CHC-111" receiver-activity-id="GB-CHC-111-B1" type="21"><narrative>Intermediary NGO</narrative></receiver-org>
+      <finance-type code="410"/>
+    </transaction>
+    <transaction>
+      <transaction-type code="3"/>
+      <transaction-date iso-date="2025-03-01"/>
+      <value value-date="2025-03-01">200000</value>
+      <receiver-org ref="GB-COH-222" receiver-activity-id="GB-COH-222-G1" type="21"><narrative>Livestock Alliance</narrative></receiver-org>
+    </transaction>
+    <transaction>
+      <transaction-type code="Disbursement"/>
+      <transaction-date iso-date="2025-04-01"/>
+      <value value-date="2025-04-01">50000</value>
+      <receiver-org ref=" gb-coh-222 "><narrative>Livestock Alliance</narrative></receiver-org>
+    </transaction>
+    <transaction>
+      <transaction-type code="2005-03-31"/>
+      <transaction-date iso-date="2025-05-01"/>
+      <value value-date="2025-05-01">1</value>
+    </transaction>
+  </iati-activity>
+</iati-activities>

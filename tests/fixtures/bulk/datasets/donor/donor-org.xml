@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<iati-organisations version="2.03">
+  <iati-organisation last-updated-datetime="2025-10-01T00:00:00">
+    <organisation-identifier>GB-GOV-1</organisation-identifier>
+    <name><narrative>Donor Ministry</narrative></name>
+  </iati-organisation>
+</iati-organisations>

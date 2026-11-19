@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture: GALVmed-style error. G1 receives from A1 (confirmed), then puts its
+     funder's activity ID (GB-GOV-1-A1) in receiver-activity-id on a payment to a
+     local firm with no ID: an implausible link. It also pays B2 (one-sided link:
+     B2 does not report the incoming funds). -->
+<iati-activities version="2.03">
+  <iati-activity default-currency="GBP" last-updated-datetime="2025-08-01T00:00:00">
+    <iati-identifier>GB-COH-222-G1</iati-identifier>
+    <reporting-org ref="GB-COH-222" type="21"><narrative>Livestock Alliance</narrative></reporting-org>
+    <title><narrative>Animal health G1</narrative></title>
+    <recipient-country code="UG" percentage="60"/>
+    <recipient-country code="KE" percentage="40"/>
+    <transaction>
+      <transaction-type code="1"/>
+      <transaction-date iso-date="2025-03-05"/>
+      <value value-date="2025-03-05">200000</value>
+      <provider-org ref="GB-GOV-1" provider-activity-id="GB-GOV-1-A1"><narrative>Donor Ministry</narrative></provider-org>
+    </transaction>
+    <transaction>
+      <transaction-type code="3"/>
+      <transaction-date iso-date="2025-04-01"/>
+      <value value-date="2025-04-01">20000</value>
+      <receiver-org receiver-activity-id="GB-GOV-1-A1"><narrative>Local Vet Supplies Ltd</narrative></receiver-org>
+    </transaction>
+    <transaction>
+      <transaction-type code="3"/>
+      <transaction-date iso-date="2025-04-15"/>
+      <value value-date="2025-04-15">30000</value>
+      <receiver-org ref="GB-CHC-111" receiver-activity-id="GB-CHC-111-B2"><narrative>Intermediary NGO</narrative></receiver-org>
+      <recipient-country code="KE"/>
+    </transaction>
+  </iati-activity>
+</iati-activities>

@@ -1,0 +1,3 @@
+key,value,unit,source,description
+mccarthy_median_funder_identification,7.7,%,"McCarthy et al. (2026), arXiv:2512.17243 v3","Median funder identification rate (share of a funder's disbursement value with an identifiable receiver, after name matching)"
+mccarthy_funders_no_receiver,46.3,%,"McCarthy et al. (2026), arXiv:2512.17243 v3","Share of funders that identify no receiver (value-based, after name matching)"

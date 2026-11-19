@@ -1,0 +1,214 @@
+iso2,name,lon,lat,featurecla
+AD,Andorra,1.52659,42.51075,Admin-0 capital
+AE,Abu Dhabi,54.36659,24.46668,Admin-0 capital
+AF,Kabul,69.18131,34.51864,Admin-0 capital
+AG,Saint John's,-61.85003,17.11804,Admin-0 capital
+AL,Tirana,19.81888,41.32754,Admin-0 capital
+AM,Yerevan,44.51161,40.1831,Admin-0 capital
+AO,Luanda,13.23248,-8.83634,Admin-0 capital
+AR,Buenos Aires,-58.43251,-34.61071,Admin-0 capital
+AT,Vienna,16.36469,48.20196,Admin-0 capital
+AU,Canberra,149.12903,-35.28303,Admin-0 capital
+AZ,Baku,49.86027,40.39722,Admin-0 capital
+BA,Sarajevo,18.383,43.85002,Admin-0 capital
+BB,Bridgetown,-59.61653,13.102,Admin-0 capital
+BD,Dhaka,90.40663,23.72501,Admin-0 capital
+BE,Brussels,4.33137,50.83526,Admin-0 capital
+BF,Ouagadougou,-1.52667,12.37226,Admin-0 capital
+BG,Sofia,23.31471,42.6853,Admin-0 capital
+BH,Manama,50.58305,26.23614,Admin-0 capital
+BI,Bujumbura,29.36001,-3.37609,Admin-0 capital
+BJ,Cotonou,2.40435,6.36298,Admin-0 capital
+BJ,Porto-Novo,2.61663,6.48331,Admin-0 capital alt
+BN,Bandar Seri Begawan,114.93328,4.88333,Admin-0 capital
+BO,La Paz,-68.15193,-16.49603,Admin-0 capital
+BO,Sucre,-65.25952,-19.04097,Admin-0 capital
+BR,Brasília,-47.918,-15.78139,Admin-0 capital
+BS,Nassau,-77.35004,25.08339,Admin-0 capital
+BT,Thimphu,89.63901,27.47299,Admin-0 capital
+BW,Gaborone,25.91195,-24.64631,Admin-0 capital
+BY,Minsk,27.56468,53.90192,Admin-0 capital
+BZ,Belmopan,-88.76707,17.25203,Admin-0 capital
+CA,Ottawa,-75.70196,45.41864,Admin-0 capital
+CD,Kinshasa,15.31303,-4.32778,Admin-0 capital
+CF,Bangui,18.55829,4.36664,Admin-0 capital
+CG,Brazzaville,15.28274,-4.25724,Admin-0 capital
+CH,Bern,7.46698,46.91668,Admin-0 capital
+CI,Abidjan,-4.02021,5.32313,Admin-0 capital
+CI,Yamoussoukro,-5.2755,6.81838,Admin-0 capital
+CL,Santiago,-70.6505,-33.44021,Admin-0 capital
+CL,Valparaíso,-71.61703,-33.04774,Admin-0 capital alt
+CM,Yaoundé,11.5147,3.86865,Admin-0 capital
+CN,Beijing,116.3942,39.90172,Admin-0 capital
+CO,Bogota,-74.08529,4.59837,Admin-0 capital
+CR,San José,-84.07881,9.93037,Admin-0 capital
+CU,Havana,-82.36613,23.1339,Admin-0 capital
+CV,Praia,-23.51669,14.9167,Admin-0 capital
+CY,Nicosia,33.36663,35.16668,Admin-0 capital
+CZ,Prague,14.42294,50.08697,Admin-0 capital
+DE,Berlin,13.3996,52.52376,Admin-0 capital
+DJ,Djibouti,43.148,11.59501,Admin-0 capital
+DK,København,12.56154,55.68051,Admin-0 capital
+DM,Roseau,-61.38701,15.30102,Admin-0 capital
+DO,Santo Domingo,-69.92974,18.47075,Admin-0 capital
+DZ,Algiers,3.04861,36.76501,Admin-0 capital
+EC,Quito,-78.502,-0.21304,Admin-0 capital
+EE,Tallinn,24.72804,59.43388,Admin-0 capital
+EG,Cairo,31.24802,30.05191,Admin-0 capital
+EH,Bir Lehlou,-9.65252,26.11917,Admin-0 capital alt
+ER,Asmara,38.93332,15.33334,Admin-0 capital
+ES,Madrid,-3.6853,40.40197,Admin-0 capital
+ET,Addis Ababa,38.69806,9.03526,Admin-0 capital
+FI,Helsinki,24.93246,60.1638,Admin-0 capital
+FJ,Suva,178.44171,-18.13302,Admin-0 capital
+FM,Palikir,158.14997,6.91664,Admin-0 capital
+FR,Paris,2.35299,48.85809,Admin-0 capital
+GA,Libreville,9.45796,0.38539,Admin-0 capital
+GB,London,-0.11867,51.50194,Admin-0 capital
+GD,Saint George's,-61.74164,12.05263,Admin-0 capital
+GE,Tbilisi,44.78885,41.72696,Admin-0 capital
+GH,Accra,-0.21866,5.55198,Admin-0 capital
+GM,Banjul,-16.5917,13.45388,Admin-0 capital
+GN,Conakry,-13.68218,9.53347,Admin-0 capital
+GQ,Malabo,8.78328,3.75002,Admin-0 capital
+GR,Athens,23.73138,37.98527,Admin-0 capital
+GT,Guatemala City,-90.52891,14.62308,Admin-0 capital
+GW,Bissau,-15.59836,11.86502,Admin-0 capital
+GY,Georgetown,-58.16703,6.80197,Admin-0 capital
+HN,Tegucigalpa,-87.21948,14.10399,Admin-0 capital
+HR,Zagreb,15.99999,45.80001,Admin-0 capital
+HT,Port-au-Prince,-72.33798,18.54297,Admin-0 capital
+HU,Budapest,19.08137,47.50195,Admin-0 capital
+ID,Jakarta,106.82749,-6.17247,Admin-0 capital
+IE,Dublin,-6.25698,53.34673,Admin-0 capital
+IL,Jerusalem,35.20663,31.77841,Admin-0 capital
+IL,Tel Aviv,34.76807,32.08194,Admin-0 capital alt
+IN,New Delhi,77.19998,28.60002,Admin-0 capital
+IQ,Baghdad,44.39192,33.34059,Admin-0 capital
+IR,Tehran,51.4224,35.67389,Admin-0 capital
+IS,Reykjavík,-21.93655,64.14346,Admin-0 capital
+IT,Rome,12.48131,41.8979,Admin-0 capital
+JM,Kingston,-76.76743,17.97708,Admin-0 capital
+JO,Amman,35.93135,31.95197,Admin-0 capital
+JP,Kyoto,135.74805,35.03194,Admin-0 capital alt
+JP,Tokyo,139.74946,35.68696,Admin-0 capital
+KE,Nairobi,36.81471,-1.2814,Admin-0 capital
+KG,Bishkek,74.58326,42.87503,Admin-0 capital
+KH,Phnom Penh,104.91469,11.55198,Admin-0 capital
+KI,Tarawa,173.01757,1.33819,Admin-0 capital
+KM,Moroni,43.24024,-11.70416,Admin-0 capital
+KN,Basseterre,-62.71701,17.30203,Admin-0 capital
+KP,Pyongyang,125.75274,39.02138,Admin-0 capital
+KR,Seoul,126.99779,37.5683,Admin-0 capital
+KW,Kuwait City,47.97636,29.37166,Admin-0 capital
+KZ,Nur-Sultan,71.42777,51.18113,Admin-0 capital
+LA,Vientiane,102.59998,17.96669,Admin-0 capital
+LB,Beirut,35.50776,33.87392,Admin-0 capital
+LC,Castries,-60.99288,14.00787,Admin-0 capital
+LI,Vaduz,9.51667,47.13372,Admin-0 capital
+LK,Colombo,79.85775,6.93197,Admin-0 capital
+LK,Sri Jayawardenepura Kotte,79.94999,6.9,Admin-0 capital alt
+LR,Monrovia,-10.79966,6.31458,Admin-0 capital
+LS,Maseru,27.48327,-29.31667,Admin-0 capital
+LT,Vilnius,25.31664,54.68337,Admin-0 capital
+LU,Luxembourg,6.13,49.61166,Admin-0 capital
+LV,Riga,24.09997,56.95002,Admin-0 capital
+LY,Tripoli,13.18001,32.8925,Admin-0 capital
+MA,Laayoune,-13.20001,27.14998,Admin-0 capital alt
+MA,Rabat,-6.83641,34.02531,Admin-0 capital
+MC,Monaco,7.40691,43.73965,Admin-0 capital
+MD,Chișinău,28.85771,47.00502,Admin-0 capital
+ME,Podgorica,19.26631,42.46597,Admin-0 capital
+MG,Antananarivo,47.51468,-18.91469,Admin-0 capital
+MH,Majuro,171.38,7.103,Admin-0 capital
+MK,Skopje,21.43346,42.00001,Admin-0 capital
+ML,Bamako,-8.00198,12.65196,Admin-0 capital
+MM,Naypyidaw,96.11667,19.7685,Admin-0 capital
+MM,Yangon,96.16473,16.7853,Admin-0 capital
+MN,Ulaanbaatar,106.91467,47.91862,Admin-0 capital
+MR,Nouakchott,-15.97534,18.08643,Admin-0 capital
+MT,Valletta,14.514709999999999,35.89973,Admin-0 capital
+MU,Port Louis,57.49999,-20.16664,Admin-0 capital
+MV,Malé,73.5089,4.17204,Admin-0 capital
+MW,Lilongwe,33.7833,-13.9833,Admin-0 capital
+MX,Mexico City,-99.13293,19.44439,Admin-0 capital
+MY,Kuala Lumpur,101.6887,3.1398,Admin-0 capital
+MY,Putrajaya,101.69504,2.93252,Admin-0 capital alt
+MZ,Maputo,32.58722,-25.95333,Admin-0 capital
+NA,Windhoek,17.08355,-22.57001,Admin-0 capital
+NE,Niamey,2.11471,13.51865,Admin-0 capital
+NG,Abuja,7.48951,9.05462,Admin-0 capital
+NG,Lagos,3.38959,6.44521,Admin-0 capital alt
+NI,Managua,-86.27044,12.15496,Admin-0 capital
+NL,Amsterdam,4.91469,52.35191,Admin-0 capital
+NL,The Hague,4.26996,52.08004,Admin-0 capital alt
+NO,Oslo,10.74803,59.91864,Admin-0 capital
+NP,Kathmandu,85.3147,27.71864,Admin-0 capital
+NZ,Wellington,174.7772,-41.29207,Admin-0 capital
+OM,Muscat,58.37831,23.58518,Admin-0 capital
+PA,Panama City,-79.53498,8.96996,Admin-0 capital
+PE,Lima,-77.05201,-12.04607,Admin-0 capital
+PG,Port Moresby,147.1925,-9.46471,Admin-0 capital
+PH,Baguio,120.56994,16.42999,Admin-0 capital alt
+PH,Manila,120.98027,14.6061,Admin-0 capital
+PK,Islamabad,73.08063,33.68937,Admin-0 capital
+PL,Warsaw,21.00535,52.23087,Admin-0 capital
+PT,Lisbon,-9.14681,38.72467,Admin-0 capital
+PW,Melekeok,134.62655,7.4874,Admin-0 capital
+PY,Asunción,-57.62583,-25.29067,Admin-0 capital
+QA,Doha,51.53297,25.28656,Admin-0 capital
+RO,Bucharest,26.098,44.43532,Admin-0 capital
+RS,Belgrade,20.46604,44.82059,Admin-0 capital
+RU,Moscow,37.61358,55.75411,Admin-0 capital
+RW,Kigali,30.05859,-1.95164,Admin-0 capital
+SA,Riyadh,46.72049,24.6345,Admin-0 capital
+SB,Honiara,159.94977,-9.43799,Admin-0 capital
+SC,Victoria,55.44999,-4.61663,Admin-0 capital
+SD,Khartoum,32.53223,15.59002,Admin-0 capital
+SE,Stockholm,18.0663,59.32413,Admin-0 capital
+SG,Singapore,103.85387,1.29498,Admin-0 capital
+SI,Ljubljana,14.51497,46.05529,Admin-0 capital
+SK,Bratislava,17.11698,48.15002,Admin-0 capital
+SL,Freetown,-13.23616,8.47196,Admin-0 capital
+SM,San Marino,12.44177,43.9361,Admin-0 capital
+SN,Dakar,-17.47508,14.71778,Admin-0 capital
+SO,Mogadishu,45.36473,2.06863,Admin-0 capital
+SR,Paramaribo,-55.16703,5.83503,Admin-0 capital
+SS,Juba,31.58003,4.82998,Admin-0 capital
+ST,São Tomé,6.72965,0.33747,Admin-0 capital
+SV,San Salvador,-89.21558,13.70328,Admin-0 capital
+SY,Damascus,36.29805,33.50198,Admin-0 capital
+SZ,Lobamba,31.2,-26.46667,Admin-0 capital alt
+SZ,Mbabane,31.13333,-26.31665,Admin-0 capital
+TD,N'Djamena,15.0472,12.11504,Admin-0 capital
+TG,Lomé,1.22081,6.1338800000000004,Admin-0 capital
+TH,Bangkok,100.5147,13.75195,Admin-0 capital
+TJ,Dushanbe,68.77388,38.56004,Admin-0 capital
+TL,Dili,125.57946,-8.55939,Admin-0 capital
+TM,Ashgabat,58.3833,37.94999,Admin-0 capital
+TN,Tunis,10.17968,36.80278,Admin-0 capital
+TO,Nuku'alofa,-175.22056,-21.13851,Admin-0 capital
+TR,Ankara,32.86245,39.92918,Admin-0 capital
+TT,Port-of-Spain,-61.51703,10.652,Admin-0 capital
+TV,Funafuti,179.21665,-8.51665,Admin-0 capital
+TW,Taipei,121.56833,25.03583,Admin-0 capital
+TZ,Dar es Salaam,39.2664,-6.79807,Admin-0 capital
+TZ,Dodoma,35.75,-6.18331,Admin-0 capital alt
+UA,Kyiv,30.51468,50.43531,Admin-0 capital
+UG,Kampala,32.58138,0.3186,Admin-0 capital
+US,"Washington,  D.C.",-77.01136,38.9015,Admin-0 capital
+UY,Montevideo,-56.18682,-34.90538,Admin-0 capital
+UZ,Tashkent,69.26882,41.30383,Admin-0 capital
+VA,Vatican City,12.45339,41.90328,Admin-0 capital
+VC,Kingstown,-61.22024,13.15576,Admin-0 capital
+VE,Caracas,-66.91898,10.50294,Admin-0 capital
+VN,Hanoi,105.84807,21.03527,Admin-0 capital
+VU,Port Vila,168.31664,-17.73335,Admin-0 capital
+WS,Apia,-171.7686,-13.83571,Admin-0 capital
+YE,Sanaa,44.20465,15.35668,Admin-0 capital
+ZA,Bloemfontein,26.22991,-29.11999,Admin-0 capital
+ZA,Cape Town,18.43304,-33.91807,Admin-0 capital
+ZA,Johannesburg,28.02806,-26.1681,Admin-0 capital
+ZA,Pretoria,28.22748,-25.70497,Admin-0 capital
+ZM,Lusaka,28.28138,-15.4147,Admin-0 capital
+ZW,Harare,31.04276,-17.81584,Admin-0 capital
